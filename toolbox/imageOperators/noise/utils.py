@@ -1,4 +1,5 @@
-from typing import Tuple
+import pathlib
+from typing import Tuple, Union
 
 import torch
 from PIL import Image, ImageOps
@@ -13,7 +14,7 @@ logger = get_module_logger(__name__)
 DID_LOG_ONCE = False
 
 
-def get_clean_image(image_path: str) -> Tuple[Image.Image, torch.Tensor]:
+def get_clean_image(image_path: Union[pathlib.Path, str]) -> Tuple[Image.Image, torch.Tensor]:
     orig_image = Image.open(image_path)
     gray_image = ImageOps.grayscale(orig_image)
     gray_t = t_transforms.ToTensor()(gray_image)
