@@ -4,7 +4,7 @@ from typing import Union
 import numpy as np
 import torch
 
-from toolbox.imageOperators.utils import StrEnum
+from ...utils import StrEnum
 
 SEED = 50
 np.random.seed(SEED)

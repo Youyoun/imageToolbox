@@ -3,7 +3,7 @@ from typing import Callable
 import numpy as np
 import torch
 
-from ..imageOperators.utils import get_module_logger
+from ..utils import get_module_logger
 
 logger = get_module_logger(__name__)
 

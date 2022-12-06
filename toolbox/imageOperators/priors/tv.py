@@ -2,7 +2,7 @@ import torch
 
 from .Function import Function
 from ..im_gradient import Gradient, Directions
-from ..utils import get_module_logger
+from ...utils import get_module_logger
 
 logger = get_module_logger(__name__)
 

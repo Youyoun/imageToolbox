@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torchvision.transforms as t_transforms
 from PIL import Image
 
-from ..utils import get_module_logger, StrEnum
+from ...utils import get_module_logger, StrEnum
 
 logger = get_module_logger(__name__)
 
