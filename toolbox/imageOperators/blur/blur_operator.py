@@ -78,14 +78,6 @@ class IdentityOperator(Operator):
         return x
 
 
-def get_kernel_fft(kernel: torch.Tensor, dimensions: Tuple[int, int, int, int]) -> torch.Tensor:
-    kernel_h = F.pad(kernel, (dimensions[3] // 2, dimensions[3] // 2, dimensions[2] // 2, dimensions[2] // 2),
-                     'constant')
-    kernel_h = torch.fft.ifftshift(kernel_h)
-    # kernel_h = kernel_h.expand(dimensions[0], dimensions[1], dimensions[2] + 2 * padding, dimensions[3] + 2 * padding)
-    return torch.fft.fft2(kernel_h)
-
-
 def expand_x_dims(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
     init_shape = x.shape
     if x.ndim == 2:
@@ -108,9 +100,9 @@ class GaussianBlurFFT(Operator):
 
     def fft_convolve(self, x: torch.Tensor, conj: bool) -> torch.Tensor:
         padding = self.kernel_size // 2
-        fft_h = get_kernel_fft(self.kernel.to(x.device), x.shape)
         x_pad = torch.nn.functional.pad(x, (padding, padding, padding, padding), self.PAD_MODE)
         fft_x = torch.fft.fft2(x_pad)
+        fft_h = torch.fft.fft2(self.kernel.to(x.device), s=x_pad.shape[2:]).unsqueeze(0).unsqueeze(0)
         if conj:
             x_new = torch.real(torch.fft.ifft2(fft_x * torch.conj(fft_h)))
         else:
@@ -121,7 +113,7 @@ class GaussianBlurFFT(Operator):
         x, init_shape = expand_x_dims(x)
         padding = self.kernel_size // 2
         x_new = self.fft_convolve(x, conj)
-        x_new = x_new[:, :, padding:- padding, padding:-padding]
+        x_new = x_new[:, :, 2*padding:, 2*padding:]
         return x_new.view(*init_shape)
 
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
@@ -180,6 +172,7 @@ def get_kernel(ksize: int, type_: Union[Kernels, str], sigma: float) -> torch.Te
     if type(type_) == str:
         type_ = _convert_str_type_to_kernel(type_)
     if type_ == Kernels.GAUSSIAN:
+        # The correct formula for ksize is: int(4 * sigma + 0.5) + 1
         kernel = np.zeros(shape=(ksize, ksize))
         kernel[ksize // 2, ksize // 2] = 1
         return torch.from_numpy(gaussian_filter(kernel, sigma)).float()  # already normalized
