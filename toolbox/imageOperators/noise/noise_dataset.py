@@ -1,9 +1,16 @@
+from typing import Tuple
+
 import torch
 from torch.utils import data as data
 
 
 class NoiseDataset(data.Dataset):
-    def __init__(self, images, transforms=None, noise=None, blur=None, percent_data: float = 0.1):
+    def __init__(self,
+                 images: list,
+                 noise: callable,
+                 blur: callable,
+                 transforms: callable = None,
+                 percent_data: float = 0.1):
         super().__init__()
         self.images = images
         self.noise_fn = noise
@@ -12,8 +19,9 @@ class NoiseDataset(data.Dataset):
         self.percent_data = percent_data
         self.blur_transform = blur
 
-    def __getitem__(self, ind):
-        label, _ = self.images[ind]
+    def __getitem__(self, ind) -> Tuple[torch.Tensor, torch.Tensor]:
+        label = self.images[ind]
+        assert label.max() == 1, "Image maximal value is > 1"
         label = self.transforms(label)
         min_ = 0
         if label.min() < 0:
@@ -22,5 +30,5 @@ class NoiseDataset(data.Dataset):
         noisified = torch.clamp(noisified, min_, 1)
         return noisified, label
 
-    def __len__(self):
+    def __len__(self) -> int:
         return int(len(self.images) * self.percent_data)
