@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import balanced_accuracy_score
 from torchvision import transforms
 
-LOG_DIR = Path("../../LOG_DIR")
+LOG_DIR = Path("./LOG_DIR")
 NEW_LOG_DIR = None
 
 to_tensor = transforms.ToTensor()
@@ -112,19 +112,19 @@ def get_module_logger(name):
     # create console handler and set level to debug
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.DEBUG)
-    fileHandler = logging.FileHandler(get_log_path() / f"logs.log")
-    fileHandler.setLevel(logging.DEBUG)
+    # fileHandler = logging.FileHandler(get_log_path() / f"logs.log")
+    # fileHandler.setLevel(logging.DEBUG)
 
     # create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # add formatter to ch
     ch.setFormatter(formatter)
-    fileHandler.setFormatter(formatter)
+    # fileHandler.setFormatter(formatter)
 
     # add ch to logger
     logger.addHandler(ch)
-    logger.addHandler(fileHandler)
+    # logger.addHandler(fileHandler)
     return logger
 
 
