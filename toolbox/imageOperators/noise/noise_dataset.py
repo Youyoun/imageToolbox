@@ -19,7 +19,7 @@ class NoiseDataset(data.Dataset):
         self.percent_data = percent_data
         self.blur_transform = blur
 
-    def __getitem__(self, ind) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, ind: int) -> Tuple[torch.Tensor, torch.Tensor]:
         label = self.images[ind]
         assert label.max() == 1, "Image maximal value is > 1"
         label = self.transforms(label)
