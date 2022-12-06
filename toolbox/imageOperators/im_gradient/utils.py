@@ -1,4 +1,9 @@
-def to_4D(t):
+from typing import Tuple
+
+import torch
+
+
+def to_4D(t: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
     init_shape = t.shape
     if t.ndim == 2:
         return t.view(1, 1, *init_shape), init_shape

@@ -1,4 +1,5 @@
 import enum
+from typing import Tuple
 
 import torch
 from torch.nn import functional as F
@@ -16,11 +17,11 @@ class Directions(enum.IntEnum):
 class Gradient:
     T = None
 
-    def __new__(self, x, direction):
+    def __new__(cls, x: torch.Tensor, direction: Directions) -> torch.Tensor:
         return Gradient.compute(x, direction)
 
     @staticmethod
-    def get_kernel(kernel, direction):
+    def get_kernel(kernel: torch.Tensor, direction: Directions) -> torch.Tensor:
         if direction == Directions.X:
             kernel = kernel.view(1, 1, -1, 1)
         elif direction == Directions.Y:
@@ -30,7 +31,7 @@ class Gradient:
         return kernel
 
     @staticmethod
-    def get_pad(direction):
+    def get_pad(direction: Directions) -> Tuple[int, int, int, int]:
         if direction == Directions.X:
             pad = (0, 0, 0, 1)
         elif direction == Directions.Y:
@@ -40,7 +41,7 @@ class Gradient:
         return pad
 
     @staticmethod
-    def compute(x, direction):
+    def compute(x: torch.Tensor, direction: Directions) -> torch.Tensor:
         _kernel = torch.tensor([-1, 1], dtype=torch.float32)
         x, init_shape = to_4D(x)
         return F.pad(F.conv2d(x, weight=Gradient.get_kernel(_kernel, direction).to(x.device), stride=1),
@@ -50,11 +51,11 @@ class Gradient:
 class GradientTranspose:
     T = Gradient
 
-    def __new__(self, x, direction):
+    def __new__(self, x: torch.Tensor, direction: Directions) -> torch.Tensor:
         return GradientTranspose.compute(x, direction)
 
     @staticmethod
-    def get_pad(direction):
+    def get_pad(direction: Directions) -> Tuple[int, int, int, int]:
         if direction == Directions.X:
             pad = (0, 0, 1, 0)
         elif direction == Directions.Y:
@@ -64,7 +65,7 @@ class GradientTranspose:
         return pad
 
     @staticmethod
-    def compute(x, direction):
+    def compute(x: torch.Tensor, direction: Directions) -> torch.Tensor:
         _kernel = torch.tensor([1, -1], dtype=torch.float32)
         x, init_shape = to_4D(x)
         return F.conv2d(F.pad(x, GradientTranspose.get_pad(direction), mode=PADDING_MODE),
