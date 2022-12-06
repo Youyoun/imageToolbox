@@ -4,9 +4,11 @@ import torch
 from PIL import Image, ImageOps
 from torchvision import transforms as t_transforms
 
-from . import logger
 from .noise import NoiseModes, get_noise_func
 from ..blur.blur_operator import BlurConvolution
+from ..utils import get_module_logger
+
+logger = get_module_logger(__name__)
 
 DID_LOG_ONCE = False
 
