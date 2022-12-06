@@ -6,7 +6,7 @@ from skimage.filters import gaussian
 
 from toolbox.imageOperators import GaussianBlurFFT, BlurConvolution, Kernels, IdentityOperator, Gradient, Directions, \
     get_clean_image
-from .parameters import BATCH_SIZE, NDIM_X, NDIM_Y, are_equal
+from tests.parameters import BATCH_SIZE, NDIM_X, NDIM_Y, are_equal
 
 
 class TestImageGradient:

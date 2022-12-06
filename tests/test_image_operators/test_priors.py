@@ -3,7 +3,7 @@ import torch
 
 from toolbox.imageOperators import Tychonov, SmoothTotalVariation, IdentityOperator
 
-from .parameters import are_equal, BATCH_SIZE, NDIM_X, NDIM_Y
+from tests.parameters import are_equal, BATCH_SIZE, NDIM_X, NDIM_Y
 
 
 class TestPriors:

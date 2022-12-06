@@ -7,7 +7,7 @@ from PIL import Image
 from scipy.stats import shapiro
 
 from toolbox.imageOperators import get_noise_func, NoiseModes, get_clean_image
-from .parameters import BATCH_SIZE, NDIM_X, NDIM_Y, are_equal
+from tests.parameters import BATCH_SIZE, are_equal
 
 POISSON_SIMILARITY_THRESH = 2
 
