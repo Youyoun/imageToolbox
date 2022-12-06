@@ -1,30 +1,30 @@
 import torch
 
-from src.Function import Function
-from src.im_gradient.image_gradient import Gradient, Directions
-from . import logger
+from .Function import Function
+from ..im_gradient import Gradient, Directions
+from ..utils import get_module_logger
 
-EPSILON_TV = 1e-6
-logger.debug(f"Epsilon for smoothed total variation is set to {EPSILON_TV}")
+logger = get_module_logger(__name__)
 
 
-class TotalVariation(Function):
-    def __init__(self):
-        pass
+class SmoothTotalVariation(Function):
+    def __init__(self, smoothing_epsilon: float = 1e-6):
+        self.epsilon_tv = smoothing_epsilon
+        logger.info(f"Epsilon for smoothed total variation is set to {self.epsilon_tv}")
 
-    def f(self, x):
+    def f(self, x: torch.Tensor) -> torch.Tensor:
         return torch.sum(
-            torch.sqrt(Gradient(x, Directions.X) ** 2 + Gradient(x, Directions.Y) ** 2 + EPSILON_TV))
+            torch.sqrt(Gradient(x, Directions.X) ** 2 + Gradient(x, Directions.Y) ** 2 + self.epsilon_tv))
 
-    def grad(self, x):
+    def grad(self, x: torch.Tensor) -> torch.Tensor:
         grad_x = Gradient(x, Directions.X)
         grad_y = Gradient(x, Directions.Y)
-        tv = torch.sqrt(grad_x * grad_x + grad_y * grad_y + EPSILON_TV)
+        tv = torch.sqrt(grad_x * grad_x + grad_y * grad_y + self.epsilon_tv)
         grad_x /= tv
         grad_y /= tv
         return Gradient.T(grad_x, Directions.X) + Gradient.T(grad_y, Directions.Y)
 
-    def autograd_f(self, x):
+    def autograd_f(self, x: torch.Tensor) -> torch.Tensor:
         with torch.enable_grad():
             x_ = x.detach().clone()
             x_.requires_grad_()

@@ -1,19 +1,13 @@
 import torch
 
-from src.Function import Function
-from src.utils import get_module_logger
-
-logger = get_module_logger(__name__)
+from .Function import Function
 
 
 class NoRegularisation(Function):
-    def __init__(self):
-        pass
-
     @staticmethod
-    def f(x):
+    def f(x: torch.Tensor) -> torch.Tensor:
         return torch.zeros_like(x).sum()
 
     @staticmethod
-    def grad(x):
+    def grad(x: torch.Tensor) -> torch.Tensor:
         return torch.zeros_like(x)
