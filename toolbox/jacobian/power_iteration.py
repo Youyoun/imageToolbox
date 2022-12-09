@@ -10,6 +10,16 @@ logger = get_module_logger(__name__)
 MIN_POWER_ITERS = 10
 
 
+def batch_norm(tensor_: torch.Tensor) -> torch.Tensor:
+    init_shape = tensor_.shape
+    return torch.norm(tensor_.view(init_shape[0], -1), dim=1).view(init_shape[0], -1)
+
+
+def batch_normalize_vector(vector: torch.Tensor) -> torch.Tensor:
+    init_shape = vector.shape
+    return (vector.view(init_shape[0], -1) / batch_norm(vector)).view(*init_shape)
+
+
 def power_method(x: torch.Tensor,
                  operator: Callable,
                  max_iter: int = 10,
@@ -27,16 +37,16 @@ def power_method(x: torch.Tensor,
     :return: (Eigenvectors, Eigenvalues) if return_vector is True, else Eigenvalue
     """
     # Make sure that the operator is symmetric else it doesn't yield a correct result.
-    assert x.ndim == 2, f"Input should be two dimensionnal, {x.ndim=}"
-    u = torch.randn_like(x)
-    u = u / torch.sum(u * u, dim=1).unsqueeze(-1)
+    input_shape = x.shape  # First dimension is always considered to be batch
+    u = batch_normalize_vector(torch.randn_like(x))
 
     z = None
     zold = None
-
     for it in np.arange(max_iter):
         v = operator(u)  # \alpha*u - (J+J^t).u (bs, C*W*H)
-        z = torch.sum(u * v, dim=1) / torch.sum(u * u, dim=1)  # z = u^T . v / u^T.u
+
+        # z = u^T . v / u^T.u
+        z = torch.sum(u.view(input_shape[0], -1) * v.view(input_shape[0], -1), dim=1) / batch_norm(u).squeeze()
 
         if it > MIN_POWER_ITERS:
             with torch.no_grad():
@@ -47,7 +57,7 @@ def power_method(x: torch.Tensor,
         zold = z
 
         # u = v / ||v|| = [alpha * I - (J + J^Y)]u / ||[alpha * I - (J + J^Y)].u||
-        u = v / torch.sum(v * v, dim=1).unsqueeze(-1)
+        u = batch_normalize_vector(v)
 
         # if is_eval:
         #     v.detach_()

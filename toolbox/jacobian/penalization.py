@@ -50,7 +50,7 @@ def penalization_fulljacobian(net: Callable,
     all_ev = get_neuralnet_jacobian_ev(net, x)
     if is_eval:
         all_ev.detach_()
-    return torch.max(torch.max(eps - all_ev), torch.zeros(1, device=x.device)) ** 2, all_ev.detach()
+    return torch.relu(eps - all_ev).max() ** 2, all_ev.min().detach()
 
 
 def penalization_powermethod(net: Callable,
@@ -66,7 +66,7 @@ def penalization_powermethod(net: Callable,
         return alpha_operator(x_new, y_new, u, alpha, is_eval)
 
     lambda_min = alpha - power_method(x_new, operator, max_iters, tol=power_iter_tol, is_eval=is_eval)
-    return torch.max(eps - lambda_min, torch.zeros_like(lambda_min)) ** 2, lambda_min
+    return torch.relu(eps - lambda_min).max() ** 2, lambda_min.min().detach()
 
 
 def penalization_optpowermethod(net: Callable,
@@ -84,7 +84,7 @@ def penalization_optpowermethod(net: Callable,
     vectors, _ = power_method(x_new, operator, max_iters, tol=power_iter_tol, is_eval=True, return_vector=True)
     rayleigh_coeff = alpha - torch.sum(vectors * operator(vectors), dim=1) / torch.sum(vectors * vectors, dim=1)
     lambda_min = rayleigh_coeff.min()
-    return torch.max(eps - lambda_min, torch.zeros_like(lambda_min)) ** 2, lambda_min
+    return torch.relu(eps - lambda_min) ** 2, lambda_min.min().detach()
 
 
 def penalization_optpowermethod_noalpha(net: Callable,
