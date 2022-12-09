@@ -49,13 +49,13 @@ def power_method(x: torch.Tensor,
         # u = v / ||v|| = [alpha * I - (J + J^Y)]u / ||[alpha * I - (J + J^Y)].u||
         u = v / torch.sum(v * v, dim=1).unsqueeze(-1)
 
-        if is_eval:
-            v.detach_()
-            u.detach_()
+        # if is_eval:
+        #     v.detach_()
+        #     u.detach_()
 
-    if is_eval:  # Just in case
-        z.detach_()
-        u.detach_()
+    # if is_eval:  # Just in case
+    #     z.detach_()
+    #     u.detach_()
     if return_vector:
         return u, z.view(-1)
     return z.view(-1)
