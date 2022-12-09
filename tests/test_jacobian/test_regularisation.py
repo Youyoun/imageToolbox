@@ -241,7 +241,21 @@ class TestEVComputation:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod(alpha, eps):
+    def test_penalization_powermethod_onevector(alpha, eps):
+        _niter = 500
+
+        x = torch.randn((1, NDIM, 1), requires_grad=True)
+        w = torch.diag(torch.randn(NDIM))
+        W = w.unsqueeze(0)
+        f = lambda x: torch.matmul(W, x)
+        print(x.shape)
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
+        assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
+
+    @staticmethod
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    def test_penalization_powermethod_batchvector(alpha, eps):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
@@ -257,31 +271,31 @@ class TestEVComputation:
 class TestOptimizedPenalizationPowerMethod:
     @staticmethod
     def test_power_method():
-        x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
+        x = torch.randn((BATCH_SIZE, NDIM, 1))
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         operator = lambda x: torch.matmul(W, x)
-        lambda_max = power_method(x, operator, max_iter=1000, tol=1e-6, is_eval=True)
+        lambda_max = power_method(x, operator, max_iter=200, tol=1e-6, is_eval=True)
         true_lambda_max = w.flatten()[torch.abs(w).argmax()]
-        assert torch.isclose(lambda_max, true_lambda_max, atol=FLOAT_TOL), (lambda_max - true_lambda_max)
+        assert are_equal(lambda_max, true_lambda_max), (lambda_max - true_lambda_max).mean()
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
     def test_penalization_powermethod(alpha, eps):
-        _niter = 500
+        _niter = 1000
 
-        x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
+        x = torch.randn((BATCH_SIZE, NDIM, 1))
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, (eps - w.min()) ** 2, rtol=FLOAT_TOL).all()
-        assert torch.isclose(ev_min, w.min(), rtol=FLOAT_TOL).all()
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2}"
+        assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_optpowermethod_random_diag(alpha, eps):
+    def test_penalization_optpowermethod_random_diag(alpha: float, eps: float):
         _niter = 500
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
@@ -289,9 +303,9 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_optpowermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, (eps - w.min()) ** 2, rtol=FLOAT_TOL).all(), f"{pen} != {eps - 2 * w.min()}"
-        assert torch.isclose(ev_min, w.min(), rtol=FLOAT_TOL).all(), f"{ev_min} != {2 * w.min()}"
+        pen, ev_min = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - 2 * w.min()}"
+        assert are_equal(ev_min, w.min()), f"{ev_min} != {2 * w.min()}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
@@ -305,9 +319,9 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = penalization_optpowermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, (eps - all_ev.min()) ** 2, rtol=FLOAT_TOL).all()
-        assert torch.isclose(ev_min, all_ev.min(), rtol=FLOAT_TOL).all()
+        pen, ev_min = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - all_ev.min()) ** 2)
+        assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
@@ -319,30 +333,30 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        pen_opt, ev_min_opt = penalization_optpowermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, pen_opt, rtol=FLOAT_TOL).all(), f"{pen} != {pen_opt}"
-        assert torch.isclose(ev_min, ev_min_opt, rtol=FLOAT_TOL).all(), f"{ev_min} != {ev_min_opt}"
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
+        assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
     def test_penalization_powermethod_optpowermethod_grads(alpha, eps):
-        _niter = 500
+        _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
         w = torch.randn(NDIM, NDIM)
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        W.requires_grad_()
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        W.requires_grad_(True)
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
-        assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).all(), \
+        assert are_equal(grad_pm, grad_pm_opt), \
             f"||gradP - gradRC|| // ||gradP|| = {torch.norm(grad_pm_opt - grad_pm) / torch.norm(grad_pm)}, " \
             f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
 
@@ -357,11 +371,11 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum() > grad_pm.nelement() * PERCENT_CLOSE, \
