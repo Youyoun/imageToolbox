@@ -482,10 +482,10 @@ class TestMonotonyLearning:
     DEVICE = "cuda:0"
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 1.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
     def test_learning_monotony_power(alpha, eps):
-        _niter = 200
-        _max_iter = 100
+        _niter = 100
+        _max_iter = 200
 
         model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearning.DEVICE)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -493,19 +493,19 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_powermethod(x, model, alpha=alpha, eps=eps, n_iters=_niter)
+            pen, evs = penalization_powermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
             optim.zero_grad()
             pen.backward()
             optim.step()
-            if evs.min() > 0.0:
+            if evs.min() >= eps:
                 break
         assert torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 1.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
     def test_learning_monotony_poweropt(alpha, eps):
         _niter = 200
-        _max_iter = 50
+        _max_iter = 500
 
         model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearning.DEVICE)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -513,16 +513,16 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_optpowermethod(x, model, alpha=alpha, eps=eps, n_iters=_niter)
+            pen, evs = penalization_optpowermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
             optim.zero_grad()
             pen.backward()
             optim.step()
-            if evs.min() > 0.0:
+            if evs.min() >= eps:
                 break
         assert torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 1.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
     def test_learning_monotony_jacobian(alpha, eps):
         _max_iter = 50
 
@@ -532,10 +532,10 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_fulljacobian(x, model, alpha=alpha, eps=eps)
+            pen, evs = penalization_fulljacobian(model, x, alpha=alpha, eps=eps)
             optim.zero_grad()
             pen.backward()
             optim.step()
-            if evs.min() > 0.0:
+            if evs.min() >= eps:
                 break
         assert torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
