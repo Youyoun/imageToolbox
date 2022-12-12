@@ -415,7 +415,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_noalpha(alpha, eps):
         _niter = 500
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -431,7 +431,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_grads(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_noalpha_grads(alpha, eps):
         _niter = 2000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -455,7 +455,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_grads_percentclose(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_noalpha_grads_percentclose(alpha, eps):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
