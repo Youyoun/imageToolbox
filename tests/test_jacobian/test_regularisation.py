@@ -193,9 +193,9 @@ class TestEVComputation:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, all_ev = penalization_fulljacobian(f, x, eps=eps, is_eval=True)
+        pen, ev_min = penalization_fulljacobian(f, x, eps=eps, is_eval=True)
         assert are_equal(pen, (eps - w.min()) ** 2)
-        assert are_equal(all_ev, torch.sort(torch.diag(w))[0])
+        assert are_equal(ev_min, w.min())
 
     @staticmethod
     def test_get_min_max_ev_fulljacobian():
@@ -242,13 +242,12 @@ class TestEVComputation:
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
     def test_penalization_powermethod_onevector(alpha, eps):
-        _niter = 500
+        _niter = 1000
 
         x = torch.randn((1, NDIM, 1), requires_grad=True)
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        print(x.shape)
         pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
@@ -394,9 +393,9 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_optpowermethod_noalpha(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, (eps - w.min()) ** 2, rtol=FLOAT_TOL).all(), f"{pen} != {eps - w.min()}"
-        assert torch.isclose(ev_min, w.min(), rtol=FLOAT_TOL).all(), f"{ev_min} != {w.min()}"
+        pen, ev_min = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - w.min()}"
+        assert are_equal(ev_min, w.min()), f"{ev_min} != {w.min()}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
@@ -410,9 +409,9 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = penalization_optpowermethod_noalpha(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        assert torch.isclose(pen, (eps - all_ev.min()) ** 2, rtol=FLOAT_TOL).all()
-        assert torch.isclose(ev_min, all_ev.min(), rtol=FLOAT_TOL).all()
+        pen, ev_min = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        assert are_equal(pen, (eps - all_ev.min()) ** 2)
+        assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
@@ -424,11 +423,11 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=True, n_iters=_niter)
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(x, f, alpha=alpha, eps=eps, is_eval=True,
-                                                                  n_iters=_niter)
-        assert torch.isclose(ev_min, ev_min_opt, rtol=FLOAT_TOL).all(), f"{ev_min} != {ev_min_opt}"
-        assert torch.isclose(pen, pen_opt, rtol=FLOAT_TOL).all(), f"{pen} != {pen_opt}"
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
+                                                                  max_iters=_niter)
+        assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
+        assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
@@ -441,15 +440,16 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(x, f, alpha=alpha, eps=eps, is_eval=False,
-                                                                  n_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
+                                                                  max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
-        assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).all(), \
+        assert are_equal(grad_pm, grad_pm_opt), \
+            f"{pen.item()=} {pen_opt.item()=}" \
             f"||gradP - gradRC|| // ||gradP|| = {torch.norm(grad_pm_opt - grad_pm) / torch.norm(grad_pm)}, " \
             f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
 
@@ -464,12 +464,12 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(x, f, alpha=alpha, eps=eps, is_eval=False, n_iters=_niter)
+        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(x, f, alpha=alpha, eps=eps, is_eval=False,
-                                                                  n_iters=_niter)
+        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
+                                                                  max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL,

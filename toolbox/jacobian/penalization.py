@@ -100,7 +100,7 @@ def penalization_optpowermethod_noalpha(net: Callable,
     def operator(u):
         return sum_J_JT(x_new, y_new, u, is_eval)
 
-    lambda_max = power_method(x_new, operator, max_iters, tol=power_iter_tol, is_eval=True)
+    lambda_max = power_method(x_new, operator, max_iters, tol=power_iter_tol, is_eval=True).max().item()
     logger.debug(f"Lambda max = {lambda_max}")
     if lambda_max < 0:
         logger.warning("The lowest EV is bigger in module than the largest EV. Setting alpha to 0 in power method.")
