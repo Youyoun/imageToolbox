@@ -135,7 +135,7 @@ def _convert_transform_str_to_enum(transform_name: str) -> AvailableTransforms:
     raise ValueError(f"{transform_name} is not implemented here.")
 
 
-def get_transforms(transforms: List[Tuple[Union[str, AvailableTransforms], Dict[str, Any]]]) -> Transform:
+def get_transforms(transforms: List[Tuple[AvailableTransforms | str, Dict[str, Any]]]) -> Compose:
     if transforms is not None and len(transforms) > 0:
         augments = []
         for transform, transform_kwargs in transforms:
