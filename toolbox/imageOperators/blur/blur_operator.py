@@ -113,7 +113,7 @@ class GaussianBlurFFT(Operator):
         x, init_shape = expand_x_dims(x)
         padding = self.kernel_size // 2
         x_new = self.fft_convolve(x, conj)
-        x_new = x_new[:, :, 2*padding:, 2*padding:]
+        x_new = x_new[:, :, 2 * padding:, 2 * padding:]
         return x_new.view(*init_shape)
 
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
@@ -126,7 +126,7 @@ class GaussianBlurFFT(Operator):
 class BlurConvolution(Operator):
     PAD_MODE = "replicate"
 
-    def __init__(self, ksize: int, type_: Kernels, s: float = 0.5):
+    def __init__(self, ksize: int, type_: Kernels | str, s: float = 0.5):
         super().__init__()
         global DID_LOG_ONCE
         # Define Gaussian Kernel

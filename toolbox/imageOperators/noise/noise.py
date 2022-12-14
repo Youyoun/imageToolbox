@@ -17,7 +17,9 @@ class NoiseModes(StrEnum):
 
 class NoiseClass:
     """Class that implements __call__ only"""
-    pass
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError()
 
 
 class GaussianNoise(NoiseClass):
