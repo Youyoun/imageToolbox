@@ -135,6 +135,7 @@ class BSD300PatchedNoisyDataset(data.Dataset):
     def group_patches(self, patches, im_size):
         return self.splitter.group_tensor(patches, im_size)
 
+
 class BSD300NoisyDataset(data.Dataset):
     def __init__(self,
                  root: Union[str, Path],
