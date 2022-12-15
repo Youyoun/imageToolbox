@@ -82,6 +82,17 @@ class Random90Rotation(Transform):
         return self.__class__.__name__ + f"(proba={self.p})"
 
 
+class RandomCrop(Transform):
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, image, target):
+        crop_params = T.RandomCrop.get_params(image, (self.size, self.size))
+        image = F.crop(image, *crop_params)
+        target = F.crop(target, *crop_params)
+        return image, target
+
+
 class RandomScaling(Transform):
     """
     Issue with random scaling: Image is smaller so cant create batch between differents sizes.
