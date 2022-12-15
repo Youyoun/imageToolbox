@@ -124,6 +124,7 @@ class AvailableTransforms(StrEnum):
     RandomVerticalFlip = auto()
     Random90Rotation = auto()
     RandomScaling = auto()
+    RandomCrop = auto()
 
 
 class TransformsFactory:
@@ -131,7 +132,8 @@ class TransformsFactory:
         AvailableTransforms.RandomVerticalFlip: RandomVerticalFlip,
         AvailableTransforms.RandomHorizontalFlip: RandomHorizontalFlip,
         AvailableTransforms.Random90Rotation: Random90Rotation,
-        AvailableTransforms.RandomScaling: RandomScaling
+        AvailableTransforms.RandomScaling: RandomScaling,
+        AvailableTransforms.RandomCrop: RandomCrop
     }
 
     @staticmethod
