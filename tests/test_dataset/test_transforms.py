@@ -7,7 +7,7 @@ from torchvision.transforms import functional as F
 from PIL import Image
 
 from toolbox.dataset import Random90Rotation, RandomVerticalFlip, RandomHorizontalFlip, get_transforms, Compose, \
-    AvailableTransforms
+    AvailableTransforms, RandomCrop
 from tests.parameters import are_equal
 
 """
@@ -16,6 +16,7 @@ Test:
 - RandomHorizontalFlip
 - RandomVerticalFlip
 - Random90Rotation
+- RandomCrop
 - get_transform()
 """
 
@@ -108,3 +109,10 @@ class TestTransforms:
                                     (AvailableTransforms.RandomVerticalFlip, {"p": p})])
         assert isinstance(transform.transforms[0], Random90Rotation) and transform.transforms[0].p == p
         assert isinstance(transform.transforms[1], RandomVerticalFlip) and transform.transforms[1].flip_prob == p
+
+    @staticmethod
+    @pytest.mark.parametrize("size", [64, 128, 256, 299])
+    def test_random_crop(size):
+        cat_t, flipped_cat_t, flipped_cat_t_2 = TestTransforms.load_image_and_transform(RandomCrop(size=size))
+        assert are_equal(flipped_cat_t, flipped_cat_t_2)
+
