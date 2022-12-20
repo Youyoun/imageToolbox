@@ -83,14 +83,17 @@ class Random90Rotation(Transform):
 
 
 class RandomCrop(Transform):
-    def __init__(self, size):
+    def __init__(self, size: int):
         self.size = size
 
-    def __call__(self, image, target):
+    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         crop_params = T.RandomCrop.get_params(image, (self.size, self.size))
         image = F.crop(image, *crop_params)
         target = F.crop(target, *crop_params)
         return image, target
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + f"(Size={self.size})"
 
 
 class RandomScaling(Transform):
