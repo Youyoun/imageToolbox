@@ -60,7 +60,9 @@ def penalization_powermethod(net: Callable,
                              max_iters: int = 300,
                              power_iter_tol: float = 1e-5,
                              is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
-    x_new, y_new = generate_new_prediction(net, x)
+    x_new = x.clone()
+    x_new.requires_grad_()
+    y_new = net(x_new)
 
     def operator(u):
         return alpha_operator(x_new, y_new, u, alpha, is_eval)
@@ -76,7 +78,9 @@ def penalization_optpowermethod(net: Callable,
                                 max_iters: int = 300,
                                 power_iter_tol: float = 1e-5,
                                 is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
-    x_new, y_new = generate_new_prediction(net, x)
+    x_new = x.clone()
+    x_new.requires_grad_()
+    y_new = net(x_new)
 
     def operator(u):
         return alpha_operator(x_new, y_new, u, alpha, is_eval)
@@ -95,7 +99,9 @@ def penalization_optpowermethod_noalpha(net: Callable,
                                         power_iter_tol: float = 1e-5,
                                         is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
     # We ignore alpha this time, get lambda max then compute lambda min.
-    x_new, y_new = generate_new_prediction(net, x)
+    x_new = x.clone()
+    x_new.requires_grad_()
+    y_new = net(x_new)
 
     def operator(u):
         return sum_J_JT(x_new, y_new, u, is_eval)
