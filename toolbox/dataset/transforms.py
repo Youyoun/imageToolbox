@@ -158,6 +158,7 @@ class AvailableTransforms(StrEnum):
     RandomScaling = auto()
     RandomCrop = auto()
     CenterCrop = auto()
+    Normalize = auto()
 
 
 class TransformsFactory:
@@ -167,7 +168,8 @@ class TransformsFactory:
         AvailableTransforms.Random90Rotation: Random90Rotation,
         AvailableTransforms.RandomScaling: RandomScaling,
         AvailableTransforms.RandomCrop: RandomCrop,
-        AvailableTransforms.CenterCrop: CenterCrop
+        AvailableTransforms.CenterCrop: CenterCrop,
+        AvailableTransforms.Normalize: Normalize
     }
 
     @staticmethod
