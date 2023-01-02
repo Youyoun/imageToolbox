@@ -7,7 +7,7 @@ from torchvision.transforms import functional as F
 from PIL import Image
 
 from toolbox.dataset import Random90Rotation, RandomVerticalFlip, RandomHorizontalFlip, get_transforms, Compose, \
-    AvailableTransforms, RandomCrop
+    AvailableTransforms, RandomCrop, CenterCrop
 from tests.parameters import are_equal
 
 """
@@ -116,3 +116,8 @@ class TestTransforms:
         cat_t, flipped_cat_t, flipped_cat_t_2 = TestTransforms.load_image_and_transform(RandomCrop(size=size))
         assert are_equal(flipped_cat_t, flipped_cat_t_2)
 
+    @staticmethod
+    @pytest.mark.parametrize("size", [64, 128, 256, 299])
+    def test_center_crop(size):
+        cat_t, flipped_cat_t, flipped_cat_t_2 = TestTransforms.load_image_and_transform(CenterCrop(size=size))
+        assert are_equal(flipped_cat_t, flipped_cat_t_2)

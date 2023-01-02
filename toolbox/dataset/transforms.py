@@ -96,6 +96,20 @@ class RandomCrop(Transform):
         return self.__class__.__name__ + f"(Size={self.size})"
 
 
+class CenterCrop(Transform):
+    def __init__(self, size: int):
+        self.size = size
+        self.crop_fn = T.CenterCrop(self.size)
+
+    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.crop_fn(image)
+        target = self.crop_fn(target)
+        return image, target
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + f"(Size={self.size})"
+
+
 class RandomScaling(Transform):
     """
     Issue with random scaling: Image is smaller so cant create batch between differents sizes.
@@ -128,6 +142,7 @@ class AvailableTransforms(StrEnum):
     Random90Rotation = auto()
     RandomScaling = auto()
     RandomCrop = auto()
+    CenterCrop = auto()
 
 
 class TransformsFactory:
@@ -136,7 +151,8 @@ class TransformsFactory:
         AvailableTransforms.RandomHorizontalFlip: RandomHorizontalFlip,
         AvailableTransforms.Random90Rotation: Random90Rotation,
         AvailableTransforms.RandomScaling: RandomScaling,
-        AvailableTransforms.RandomCrop: RandomCrop
+        AvailableTransforms.RandomCrop: RandomCrop,
+        AvailableTransforms.CenterCrop: CenterCrop
     }
 
     @staticmethod
