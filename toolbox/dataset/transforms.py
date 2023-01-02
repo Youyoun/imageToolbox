@@ -110,6 +110,21 @@ class CenterCrop(Transform):
         return self.__class__.__name__ + f"(Size={self.size})"
 
 
+class Normalize(Transform):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+        self.normalize = T.Normalize(mean, std)
+
+    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        image = self.normalize(image)
+        target = self.normalize(target)
+        return image, target
+
+    def __repr__(self) -> str:
+        return self.__class__.__name__ + f"(Mean={self.mean}, Std={self.std})"
+
+
 class RandomScaling(Transform):
     """
     Issue with random scaling: Image is smaller so cant create batch between differents sizes.
