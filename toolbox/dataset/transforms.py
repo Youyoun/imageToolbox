@@ -1,12 +1,10 @@
-from ctypes import Union
-from enum import auto
-
 import random
-from typing import List, Tuple, Dict, Any
+from enum import auto
+from typing import List, Tuple, Dict, Any, Union
 
 import torch
-from torchvision.transforms import functional as F
 from torchvision import transforms as T
+from torchvision.transforms import functional as F
 
 from toolbox.utils import StrEnum
 
@@ -184,7 +182,7 @@ def _convert_transform_str_to_enum(transform_name: str) -> AvailableTransforms:
     raise ValueError(f"{transform_name} is not implemented here.")
 
 
-def get_transforms(transforms: List[Tuple[AvailableTransforms | str, Dict[str, Any]]]) -> Compose:
+def get_transforms(transforms: List[Tuple[Union[AvailableTransforms, str], Dict[str, Any]]]) -> Compose:
     if transforms is not None and len(transforms) > 0:
         augments = []
         for transform, transform_kwargs in transforms:

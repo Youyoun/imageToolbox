@@ -23,15 +23,15 @@ class BSD300PatchedNoisyDataset(data.Dataset):
                  n_images: int,
                  inner_patch_size: int,
                  outer_patch_size: int,
-                 blur_type: str | None,
+                 blur_type: Union[str,None],
                  kernel_size: int,
                  kernel_std: float,
-                 noise_mode: str | NoiseModes,
+                 noise_mode: Union[str, NoiseModes],
                  gaussian_noise_mean: float,
                  gaussian_noise_std: float,
                  poisson_noise_scale: float,
                  is_train: bool = True,
-                 transforms: List[Tuple[AvailableTransforms | str, Dict]] = None):
+                 transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
         self.data_path = Path(root)
         self.n_images = n_images
         self.splitter = ImageSplitterOverlapIgnored(inner_patch_size, outer_patch_size)
@@ -140,15 +140,15 @@ class BSD300NoisyDataset(data.Dataset):
     def __init__(self,
                  root: Union[str, Path],
                  n_images: int,
-                 blur_type: str | None,
+                 blur_type: Union[str, None],
                  kernel_size: int,
                  kernel_std: float,
-                 noise_mode: str | NoiseModes,
+                 noise_mode: Union[str, NoiseModes],
                  gaussian_noise_mean: float,
                  gaussian_noise_std: float,
                  poisson_noise_scale: float,
                  is_train: bool = True,
-                 transforms: List[Tuple[AvailableTransforms | str, Dict]] = None):
+                 transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train

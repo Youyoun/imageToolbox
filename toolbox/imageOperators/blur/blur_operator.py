@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import Union, Tuple
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as t_transforms
 from PIL import Image
+from scipy.ndimage import gaussian_filter
 
 from ...utils import get_module_logger, StrEnum
 
@@ -126,7 +126,7 @@ class GaussianBlurFFT(Operator):
 class BlurConvolution(Operator):
     PAD_MODE = "replicate"
 
-    def __init__(self, ksize: int, type_: Kernels | str, s: float = 0.5):
+    def __init__(self, ksize: int, type_: Union[Kernels, str], s: float = 0.5):
         super().__init__()
         global DID_LOG_ONCE
         # Define Gaussian Kernel

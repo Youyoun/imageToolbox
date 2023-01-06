@@ -4,9 +4,9 @@ from typing import Union, List, Tuple, Dict, Callable
 
 from torch.utils import data as data
 
+from .transforms import get_transforms, AvailableTransforms
 from ..imageOperators import get_clean_image
 from ..utils import get_module_logger
-from .transforms import get_transforms, AvailableTransforms
 
 logger = get_module_logger(__name__)
 
@@ -17,7 +17,7 @@ class GenericDataset(data.Dataset):
                  n_images: int,
                  clean_transform_fn: Callable,
                  is_train: bool = True,
-                 augments: List[Tuple[AvailableTransforms | str, Dict]] = None):
+                 augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train
