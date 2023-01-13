@@ -21,7 +21,9 @@ class GenericDataset(data.Dataset):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train
-        self.im_path = glob.glob(str(self.data_path / "*.jpg"))[:self.n_images]
+        self.im_path = glob.glob(str(self.data_path / "*.jpg"))
+        if n_images > 0:
+            self.im_path = self.im_path[: self.n_images]
 
         self.transform_fn = clean_transform_fn
 
