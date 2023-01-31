@@ -1,3 +1,4 @@
+import functools
 from typing import Callable, Tuple
 
 import torch
@@ -73,3 +74,22 @@ def generate_new_prediction(net: Callable, x: torch.Tensor) -> Tuple[torch.Tenso
     x_detached.requires_grad_()
     y_pred = net(x_detached.view(x.shape)).flatten(start_dim=1)
     return x_detached, y_pred
+
+
+def transform_contraint(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(net: Callable,
+                x: torch.Tensor,
+                eps: float = 0.00,
+                alpha: float = None,
+                max_iters: int = 300,
+                power_iter_tol: float = 1e-5,
+                is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+        EPS = -1 + eps
+
+        def two_net_minus_identity(x: torch.Tensor) -> torch.Tensor:
+            return 2 * net(x) - x
+
+        return func(two_net_minus_identity, x, EPS, alpha, max_iters, power_iter_tol, is_eval)
+
+    return wrapper
