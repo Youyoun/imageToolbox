@@ -58,6 +58,19 @@ def sum_J_JT(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = 
     return 1 / 2 * (Ju(x, y, u, is_eval) + JTu(x, y, u, is_eval))
 
 
+def JTJu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+    """"
+    Returns the jacobian transposed times the jacobian times a certain vector (M^T @ M)
+    The jacobian is evaluated on x according to y (J_y(x)).
+    :param x: input vector (must require grad)
+    :param y: output vector (output of neural network)
+    :param u: The gradient direction (the vector of JVP)
+    :param is_eval: Either to save the graph for backprogation or not (train or eval mode)
+    :return: J_y(x).T @ J_y(x) @ v
+    """
+    return JTu(x, y, Ju(x, y, u, is_eval=is_eval), is_eval=is_eval)
+
+
 def compute_jacobian(net: callable, x: torch.Tensor) -> torch.Tensor:
     """
     Compute the exact jacobian of the neural network (callable function at least)

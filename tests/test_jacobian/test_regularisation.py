@@ -7,8 +7,8 @@ import torch.nn.functional as F
 from torch.autograd.functional import jacobian
 
 from toolbox.jacobian import Ju, JTu, alpha_operator, sum_J_JT, compute_jacobian, batch_jacobian, \
-    penalization_fulljacobian, penalization_powermethod, \
-    penalization_optpowermethod, penalization_optpowermethod_noalpha, power_method, \
+    monotone_penalization_fulljacobian, monotone_penalization_powermethod, \
+    monotone_penalization_optpowermethod, monotone_penalization_optpowermethod_noalpha, power_method, \
     get_min_max_ev_neuralnet_fulljacobian, get_lambda_min_or_max_poweriter, generate_new_prediction, \
     get_neuralnet_jacobian_ev
 from tests.parameters import BATCH_SIZE, NDIM_Y, NDIM_X, FLOAT_TOL, are_equal
@@ -193,7 +193,7 @@ class TestEVComputation:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_fulljacobian(f, x, eps=eps, is_eval=True)
+        pen, ev_min = monotone_penalization_fulljacobian(f, x, eps=eps, is_eval=True)
         assert are_equal(pen, (eps - w.min()) ** 2)
         assert are_equal(ev_min, w.min())
 
@@ -248,7 +248,7 @@ class TestEVComputation:
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
@@ -262,7 +262,7 @@ class TestEVComputation:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
@@ -288,7 +288,7 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
@@ -302,7 +302,7 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - 2 * w.min()}"
         assert are_equal(ev_min, w.min()), f"{ev_min} != {2 * w.min()}"
 
@@ -318,7 +318,7 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - all_ev.min()) ** 2)
         assert are_equal(ev_min, all_ev.min())
 
@@ -332,8 +332,8 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
-        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
         assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
 
@@ -348,11 +348,11 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_(True)
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert are_equal(grad_pm, grad_pm_opt), \
@@ -370,11 +370,11 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum() > grad_pm.nelement() * PERCENT_CLOSE, \
@@ -393,7 +393,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - w.min()}"
         assert are_equal(ev_min, w.min()), f"{ev_min} != {w.min()}"
 
@@ -409,7 +409,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
         assert are_equal(pen, (eps - all_ev.min()) ** 2)
         assert are_equal(ev_min, all_ev.min())
 
@@ -423,9 +423,9 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
-                                                                  max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
+                                                                           max_iters=_niter)
         assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
         assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
 
@@ -440,12 +440,12 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                  max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
+                                                                           max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert are_equal(grad_pm, grad_pm_opt), \
@@ -464,12 +464,12 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                  max_iters=_niter)
+        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
+                                                                           max_iters=_niter)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL,
@@ -493,7 +493,7 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_powermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
+            pen, evs = monotone_penalization_powermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
             optim.zero_grad()
             pen.backward()
             optim.step()
@@ -513,7 +513,7 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_optpowermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
+            pen, evs = monotone_penalization_optpowermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
             optim.zero_grad()
             pen.backward()
             optim.step()
@@ -532,7 +532,7 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = penalization_fulljacobian(model, x, alpha=alpha, eps=eps)
+            pen, evs = monotone_penalization_fulljacobian(model, x, alpha=alpha, eps=eps)
             optim.zero_grad()
             pen.backward()
             optim.step()
