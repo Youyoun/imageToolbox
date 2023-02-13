@@ -144,13 +144,13 @@ class GammaSearch:
 
         while True:
             # A(x_k) = \nabla F(x_k, y) + \lambda \nabla R(x_k)
-            nabla_f = self.grad_op(x, y)
+            nabla_f = self.grad_op(x)
 
             # proj_C(x_k - \gamma A(x_k)
             Zc = self.projection(x - self.gamma * nabla_f)
 
             # \gamma ||A(Z_C(x_k, y)) - A(x_k)||
-            diff_op = self.gamma * np.linalg.norm((self.grad_op(Zc, y) - nabla_f).flatten(), ord=2)
+            diff_op = self.gamma * np.linalg.norm((self.grad_op(Zc) - nabla_f).flatten(), ord=2)
 
             # \theta || Z_C(x_k, \gamma) - x_k||
             diff_x = self.theta * np.linalg.norm((Zc - x).flatten(), ord=2)
