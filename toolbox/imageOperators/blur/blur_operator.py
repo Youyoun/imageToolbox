@@ -126,7 +126,7 @@ class GaussianBlurFFT(Operator):
 class BlurConvolution(Operator):
     PAD_MODE = "replicate"
 
-    def __init__(self, ksize: int, type_: Union[Kernels, str], s: float = 0.5):
+    def __init__(self, ksize: int, type_: Union[Kernels, str], s: Union[float, Tuple[float, float]] = 0.5):
         super().__init__()
         global DID_LOG_ONCE
         # Define Gaussian Kernel
@@ -168,13 +168,15 @@ def _convert_str_type_to_kernel(str_: str) -> Kernels:
     raise ValueError(f"Kernel provided is not available: {str_}")
 
 
-def get_kernel(ksize: int, type_: Union[Kernels, str], sigma: float) -> torch.Tensor:
+def get_kernel(ksize: int, type_: Union[Kernels, str], sigma: Union[float, Tuple[float, float]]) -> torch.Tensor:
     if type(type_) == str:
         type_ = _convert_str_type_to_kernel(type_)
     if type_ == Kernels.GAUSSIAN:
         # The correct formula for ksize is: int(4 * sigma + 0.5) + 1
         kernel = np.zeros(shape=(ksize, ksize))
         kernel[ksize // 2, ksize // 2] = 1
+        if isinstance(sigma, float):
+            sigma = (sigma, sigma)
         return torch.from_numpy(gaussian_filter(kernel, sigma)).float()  # already normalized
     elif type_ == Kernels.UNIFORM:
         return torch.ones((ksize, ksize)) / ksize ** 2
