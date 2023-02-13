@@ -26,7 +26,7 @@ def mean_squared_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[
     :return: Mean squared error = ||tensor1 - tensor2||_2^2 / N
     """
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) ** 2 / tensor1.nelement()
+    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) ** 2 / tensor1.size
 
 
 def mean_absolute_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]) -> float:
@@ -38,7 +38,7 @@ def mean_absolute_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union
     :return: Mean absolute error = ||tensor1 - tensor2||_1 / N
     """
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=1) / tensor1.nelement()
+    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=1) / tensor1.size
 
 
 def compute_relative_difference(tensor1: Union[torch.Tensor, np.ndarray],
