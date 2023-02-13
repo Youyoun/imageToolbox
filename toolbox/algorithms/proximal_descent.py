@@ -2,7 +2,7 @@ from typing import Callable
 
 import numpy as np
 
-from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference
+from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
 
 
 def prox_descent(input_vector: np.ndarray,
@@ -49,7 +49,8 @@ def prox_descent(input_vector: np.ndarray,
                 "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
                 "R(x_{k+1})": R_x,
                 "F(x_{k+1})": F_x,
-                r"$F(x_{k+1}) + \lambda R(x_{k+1})$": F_x + lambda_ * R_x,
+                "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
+                "SNR": SNR(xk, input_vector),
             }
         )
         if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
