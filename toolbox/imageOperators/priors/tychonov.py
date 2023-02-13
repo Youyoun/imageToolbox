@@ -21,6 +21,5 @@ class Tychonov(Function):
     def autograd(self, x: torch.Tensor) -> torch.Tensor:
         x_ = x.detach().clone()
         x_.requires_grad_()
-
         self.f(x_).backward()
         return x_.grad
