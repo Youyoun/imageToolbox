@@ -15,6 +15,12 @@ class MetricNames(Enum):
     RELDIFF = auto()
     SNR = auto()
     SSIM = auto()
+    LOSS = auto()
+    L1 = auto()
+    L2 = auto()
+    PENALTY = auto()
+    NORM = auto()
+    EIGENVALUE = auto()
 
 
 def mean_squared_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]) -> float:
