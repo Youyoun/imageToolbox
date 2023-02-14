@@ -5,6 +5,14 @@ import numpy as np
 
 
 class BaseMetric(abc.ABC):
+    """
+    Base class for metrics
+    Exposes the following methods:
+    - update: update the metric with a new value
+    - compute: compute the metric
+    - init: reset the metric
+    """
+
     @abc.abstractmethod
     def update(self, value: float) -> None:
         pass
@@ -19,6 +27,11 @@ class BaseMetric(abc.ABC):
 
 
 class MetricAverage(BaseMetric):
+    """
+    Compute the average of a metric
+    Logs all the values and compute the mean
+    """
+
     def __init__(self):
         self.value_array = []
 
@@ -46,9 +59,40 @@ class MetricArray(BaseMetric):
         self.value_array = []
 
 
-class MetricsDictionary:
+class MetricsAggregator(abc.ABC):
+    """
+    Base class for metrics aggregator
+    Exposes the following methods:
+    - add: add a new metric dictionary
+    - get_all: get all the metrics
+    - __getitem__: get a specific metric
+    - reset: reset the metrics
+    """
+
+    @abc.abstractmethod
+    def add(self, metrics_dics: Dict[Any, float]) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_all(self) -> Dict[Any, float]:
+        pass
+
+    @abc.abstractmethod
+    def __getitem__(self, item: Any) -> float:
+        pass
+
+    @abc.abstractmethod
+    def reset(self) -> None:
+        pass
+
+
+class MetricsDictionary(MetricsAggregator):
+    """
+    Compute a dictionary of MetricArray objects from a dictionary of {metrics: values}
+    Returns a dictionary of {metrics: [values]}
+    """
     def __init__(self):
-        self.metrics = {}
+        self.metrics: Dict[Any, MetricArray] = {}
 
     def add(self, metrics_dics: Dict[Any, float]) -> None:
         for k, v in metrics_dics.items():
@@ -67,9 +111,13 @@ class MetricsDictionary:
             self.metrics[k].init()
 
 
-class AverageMetricsDictionary:
+class AverageMetricsDictionary(MetricsAggregator):
+    """
+    Compute a dictionary of MetricAverage objects from a dictionary of {metrics: values}
+    Returns a dictionary of {metrics: average}
+    """
     def __init__(self):
-        self.metrics = {}
+        self.metrics: Dict[Any, MetricAverage] = {}
 
     def add(self, metrics_dics: Dict[Any, float]):
         for k, v in metrics_dics.items():
