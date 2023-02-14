@@ -74,7 +74,7 @@ def PSNR(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.
     :return: PSNR = 20 * log10(max(I)) - 10 * log10(MSE)
     """
     tensor_true, tensor_test = to_numpy_if_tensor(tensor_true, tensor_test)
-    return peak_signal_noise_ratio(tensor_true, tensor_test, data_range=1)
+    return peak_signal_noise_ratio(tensor_true, tensor_test)
 
 
 def SSIM(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.Tensor, np.ndarray]) -> float:
@@ -86,15 +86,14 @@ def SSIM(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.
     :return: SSIM
     """
     tensor_true, tensor_test = to_numpy_if_tensor(tensor_true, tensor_test)
-    return structural_similarity(tensor_true, tensor_test, data_range=1)
+    return structural_similarity(tensor_true, tensor_test)
 
 
-def SNR(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.Tensor, np.ndarray]) -> float:
+def SNR(tensor: Union[torch.Tensor, np.ndarray]) -> float:
     """
-    Compute the signal-to-noise ratio (SNR) between two tensors or numpy arrays.
-    :param tensor_true: True tensor.
-    :param tensor_test: Test tensor.
-    :return: SNR = 10 * log10(var(tensor_true) / var(tensor_test - tensor_true))
+    Compute the signal-to-noise ratio (SNR) of an image.
+    :param tensor: Tensor.
+    :return: SNR = 10 * log10(mean(I) / std(I))
     """
-    tensor_true, tensor_test = to_numpy_if_tensor(tensor_true, tensor_test)
-    return 10 * np.log10(np.var(tensor_true) / np.var(tensor_test - tensor_true))
+    tensor = to_numpy_if_tensor(tensor)
+    return 10 * np.log10(np.mean(tensor) / np.std(tensor))
