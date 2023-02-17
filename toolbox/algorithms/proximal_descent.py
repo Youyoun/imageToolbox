@@ -50,7 +50,7 @@ def prox_descent(input_vector: np.ndarray,
                 "R(x_{k+1})": R_x,
                 "F(x_{k+1})": F_x,
                 "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
-                "SNR": SNR(xk, input_vector),
+                "SNR": SNR(xk),
             }
         )
         if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:

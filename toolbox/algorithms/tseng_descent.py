@@ -3,7 +3,6 @@ from typing import Callable
 import numpy as np
 
 from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
-
 from ..utils import get_module_logger
 
 logger = get_module_logger(__name__)
@@ -37,11 +36,11 @@ def tseng_gradient_descent(input_vector: np.ndarray,
     """
     _tol = 1e-8
 
+    def operator(x):
+        return grad_xF(x, y=input_vector) + lambda_ * grad_xR(x)
+
     armijo = None
     if use_armijo:
-        def operator(x):
-            return grad_xF(x, y=input_vector) + lambda_ * grad_xR(x)
-
         armijo = GammaSearch(operator, sigma=gamma, gamma_min=1e-6, reset_each_search=True)
 
     xk_old = input_vector.copy()
@@ -51,9 +50,9 @@ def tseng_gradient_descent(input_vector: np.ndarray,
         if armijo is not None:
             gamma = armijo.run_search_get_gamma(xk, y=input_vector)
         # Update (one step)
-        ak = grad_xF(xk, y=input_vector) + lambda_ * grad_xR(xk)
+        ak = operator(xk)
         zk = xk - gamma * ak
-        xk = zk - gamma * (grad_xF(zk, y=input_vector) + lambda_ * grad_xR(zk) - ak)
+        xk = zk - gamma * (operator(zk) - ak)
 
         # Compute metrics
         R_x, F_x = 0, 0
@@ -68,7 +67,7 @@ def tseng_gradient_descent(input_vector: np.ndarray,
                 "R(x_{k+1})": R_x,
                 "F(x_{k+1})": F_x,
                 "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
-                "SNR": SNR(xk, input_vector),
+                "SNR": SNR(xk),
             }
         )
         if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
