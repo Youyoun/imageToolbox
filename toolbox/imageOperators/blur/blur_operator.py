@@ -88,7 +88,7 @@ def expand_x_dims(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
 
 
 class GaussianBlurFFT(Operator):
-    PAD_MODE = "replicate"
+    PAD_MODE = "constant"
 
     def __init__(self, ksize: int, s: float = 0.5):
         super().__init__()
@@ -104,6 +104,7 @@ class GaussianBlurFFT(Operator):
         fft_x = torch.fft.fft2(x_pad)
         fft_h = torch.fft.fft2(self.kernel.to(x.device), s=x_pad.shape[2:]).unsqueeze(0).unsqueeze(0)
         if conj:
+            print("Computing conjugate")
             x_new = torch.real(torch.fft.ifft2(fft_x * torch.conj(fft_h)))
         else:
             x_new = torch.real(torch.fft.ifft2(fft_x * fft_h))
@@ -113,7 +114,10 @@ class GaussianBlurFFT(Operator):
         x, init_shape = expand_x_dims(x)
         padding = self.kernel_size // 2
         x_new = self.fft_convolve(x, conj)
-        x_new = x_new[:, :, 2 * padding:, 2 * padding:]
+        if conj:
+            x_new = x_new[:, :, :-2 * padding, :-2 * padding]
+        else:
+            x_new = x_new[:, :, 2 * padding:, 2 * padding:]
         return x_new.view(*init_shape)
 
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
@@ -124,7 +128,7 @@ class GaussianBlurFFT(Operator):
 
 
 class BlurConvolution(Operator):
-    PAD_MODE = "replicate"
+    PAD_MODE = "constant"
 
     def __init__(self, ksize: int, type_: Union[Kernels, str], s: Union[float, Tuple[float, float]] = 0.5):
         super().__init__()
