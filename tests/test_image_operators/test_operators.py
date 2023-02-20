@@ -4,9 +4,9 @@ import pytest
 import torch
 from skimage.filters import gaussian
 
+from tests.parameters import BATCH_SIZE, NDIM_X, NDIM_Y, are_equal
 from toolbox.imageOperators import GaussianBlurFFT, BlurConvolution, Kernels, IdentityOperator, Gradient, Directions, \
     get_clean_image
-from tests.parameters import BATCH_SIZE, NDIM_X, NDIM_Y, are_equal
 
 
 class TestImageGradient:
@@ -131,3 +131,15 @@ class TestBlurOperators:
         x = torch.randn(1, NDIM_X, NDIM_Y)
         id = IdentityOperator()
         assert are_equal(id @ x, x)
+
+    @staticmethod
+    @pytest.mark.parametrize('kernel', Kernels)
+    def test_conjugate_property(kernel: Kernels):
+        blurr = BlurConvolution(31, kernel, 3.0)
+        u1 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        Au1 = blurr @ u1
+        Atu2 = blurr.T @ u2
+        z1 = torch.matmul(u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1))
+        z2 = torch.matmul(Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1))
+        assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
