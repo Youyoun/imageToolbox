@@ -89,3 +89,75 @@ class TestTsengInverse:
             do_compute_metrics=False
         )
         assert are_equal(w_inv, w_t_inv), f"{abs(w_inv - w_t_inv).max()}"
+
+
+class TestTsengConvergence:
+    @staticmethod
+    def test_tseng_quadratic_to_zero():
+        NDIM_X = 32
+
+        def grad_xF(x, y):
+            return x
+
+        def grad_xR(x):
+            return torch.zeros_like(x)
+
+        x = torch.randn(NDIM_X)
+        y_, _ = tseng_gradient_descent(
+            x,
+            grad_xF,
+            grad_xR,
+            gamma=1.0,
+            lambda_=1.0,
+            use_armijo=True,
+            max_iter=2000,
+            do_compute_metrics=False
+        )
+        assert are_equal(y_, torch.zeros_like(y_)), f"{abs(y_).max()}"
+
+    @staticmethod
+    def test_tseng_quadratic_to_ones():
+        NDIM_X = 32
+
+        def grad_xF(x, y):
+            return x - torch.ones_like(x)
+
+        def grad_xR(x):
+            return torch.zeros_like(x)
+
+        x = torch.randn(NDIM_X)
+        y_, _ = tseng_gradient_descent(
+            x,
+            grad_xF,
+            grad_xR,
+            gamma=1.0,
+            lambda_=1.0,
+            use_armijo=True,
+            max_iter=2000,
+            do_compute_metrics=False
+        )
+        assert are_equal(y_, torch.ones_like(y_)), f"{abs(y_ - torch.ones_like(y_)).max()}"
+
+    @staticmethod
+    def test_tseng_quadratic_to_random():
+        NDIM_X = 32
+        Y = torch.randn(NDIM_X)
+
+        def grad_xF(x, y):
+            return x - Y
+
+        def grad_xR(x):
+            return torch.zeros_like(x)
+
+        x = torch.randn(NDIM_X)
+        y_, _ = tseng_gradient_descent(
+            x,
+            grad_xF,
+            grad_xR,
+            gamma=1.0,
+            lambda_=1.0,
+            use_armijo=True,
+            max_iter=2000,
+            do_compute_metrics=False
+        )
+        assert are_equal(y_, Y), f"{abs(y_ - Y).max()}"
