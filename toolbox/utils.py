@@ -34,6 +34,8 @@ def get_module_logger(name):
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    if logger.hasHandlers():
+        return logger
     # create console handler and set level to debug
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.DEBUG)
