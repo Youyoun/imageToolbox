@@ -17,7 +17,8 @@ def tseng_gradient_descent(input_vector: np.ndarray,
                            max_iter: int = 1000,
                            real_x: np.ndarray = None,
                            regul_function: Callable = None,
-                           fidelity_function: Callable = None) -> (np.ndarray, MetricsDictionary):
+                           fidelity_function: Callable = None,
+                           do_compute_metrics: bool = True) -> (np.ndarray, MetricsDictionary):
     """
     Tseng's gradient descent algorithm.
     :param input_vector: Input vector.
@@ -32,16 +33,21 @@ def tseng_gradient_descent(input_vector: np.ndarray,
     :param regul_function: Regularization function. Must have the signature regul_function(x, gamma)
         where x is the input vector and gamma is the step size.
     :param fidelity_function: Fidelity function. Must have the signature fidelity_function(x, y)
+    :param do_compute_metrics: If True, compute metrics.
     :return: Last iterate and metrics dictionary.
     """
     _tol = 1e-8
+    logger.info("Running Tseng's gradient descent algorithm...")
+    logger.debug(f"Parameters: gamma={gamma}, lambda={lambda_}, use_armijo={use_armijo}, max_iter={max_iter}")
+    logger.debug(f"Input vector shape: {input_vector.shape}")
+    logger.debug("Computing metrics..." if do_compute_metrics else "Not computing metrics...")
 
     def operator(x):
         return grad_xF(x, y=input_vector) + lambda_ * grad_xR(x)
 
     armijo = None
     if use_armijo:
-        armijo = GammaSearch(operator, sigma=gamma, gamma_min=1e-6, reset_each_search=True)
+        armijo = GammaSearch(operator, sigma=gamma, gamma_min=1e-6, reset_each_search=False)
 
     xk_old = input_vector.copy()
     xk = xk_old
@@ -55,25 +61,28 @@ def tseng_gradient_descent(input_vector: np.ndarray,
         xk = zk - gamma * (operator(zk) - ak)
 
         # Compute metrics
-        R_x, F_x = 0, 0
-        if regul_function is not None:
-            R_x = regul_function(xk, lambda_)
-        if fidelity_function is not None:
-            F_x = fidelity_function(xk, input_vector)
-        metrics.add(
-            {
-                "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
-                "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
-                "R(x_{k+1})": R_x,
-                "F(x_{k+1})": F_x,
-                "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
-                "SNR": SNR(xk),
-            }
-        )
-        if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
-            print(f"Descent reached tolerance={_tol} at step {step}")
-            break
-        xk_old = xk.copy()
+        if not do_compute_metrics:
+            continue
+        else:
+            R_x, F_x = 0, 0
+            if regul_function is not None:
+                R_x = regul_function(xk, lambda_)
+            if fidelity_function is not None:
+                F_x = fidelity_function(xk, input_vector)
+            metrics.add(
+                {
+                    "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
+                    "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
+                    "R(x_{k+1})": R_x,
+                    "F(x_{k+1})": F_x,
+                    "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
+                    "SNR": SNR(xk),
+                }
+            )
+            if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
+                print(f"Descent reached tolerance={_tol} at step {step}")
+                break
+            xk_old = xk.copy()
     return xk, metrics
 
 
@@ -111,7 +120,7 @@ class GammaSearch:
         if self.projection is None:
             self.projection = lambda x: x
         self.reset_each_search = reset_each_search
-        logger.debug(f"Armijo is {'not' if self.reset_each_search else ''} reset after each iteration.")
+        logger.debug(f"Armijo is {'not' if not self.reset_each_search else ''} reset after each iteration.")
 
     @property
     def gamma(self):
