@@ -1,6 +1,7 @@
-from typing import Callable
+from typing import Callable, Union
 
 import numpy as np
+import torch
 
 from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
 from ..utils import get_module_logger
@@ -8,7 +9,7 @@ from ..utils import get_module_logger
 logger = get_module_logger(__name__)
 
 
-def tseng_gradient_descent(input_vector: np.ndarray,
+def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
                            grad_xF: Callable,
                            grad_xR: Callable,
                            gamma: float,
@@ -49,7 +50,10 @@ def tseng_gradient_descent(input_vector: np.ndarray,
     if use_armijo:
         armijo = GammaSearch(operator, sigma=gamma, gamma_min=1e-6, reset_each_search=False)
 
-    xk_old = input_vector.copy()
+    if isinstance(input_vector, np.ndarray):
+        xk_old = input_vector.copy()
+    else:
+        xk_old = input_vector.clone()
     xk = xk_old
     metrics = MetricsDictionary()
     for step in range(max_iter):
@@ -82,7 +86,10 @@ def tseng_gradient_descent(input_vector: np.ndarray,
             if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
-            xk_old = xk.copy()
+            if isinstance(input_vector, np.ndarray):
+                xk_old = xk.copy()
+            else:
+                xk_old = xk.clone()
     return xk, metrics
 
 
