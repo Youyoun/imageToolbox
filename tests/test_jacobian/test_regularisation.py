@@ -1,5 +1,4 @@
 import itertools
-from typing import Callable
 
 import pytest
 import torch
@@ -9,10 +8,9 @@ from torch.autograd.functional import jacobian
 
 from tests.parameters import BATCH_SIZE, FLOAT_TOL, are_equal
 from toolbox.jacobian import Ju, JTu, alpha_operator, sum_J_JT, compute_jacobian, batch_jacobian, \
-    monotone_penalization_fulljacobian, monotone_penalization_powermethod, \
-    monotone_penalization_optpowermethod, monotone_penalization_optpowermethod_noalpha, power_method, \
+    PenalizationMethods, MonotonyRegularization, power_method, \
     get_min_max_ev_neuralnet_fulljacobian, get_lambda_min_or_max_poweriter, generate_new_prediction, \
-    get_neuralnet_jacobian_ev, transform_contraint
+    get_neuralnet_jacobian_ev, MonotonyRegularizationShift
 
 PERCENT_CLOSE = 0.9
 NDIM = 50
@@ -188,13 +186,13 @@ class TestEVComputation:
 
     @staticmethod
     @pytest.mark.parametrize('eps', [0.0, 0.5, 1.0, 5.0])
-    def test_penalization_fulljacobian(eps):
+    def test_penalization_fulljacobian(eps: float):
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = monotone_penalization_fulljacobian(f, x, eps=eps, is_eval=True)
+        pen, ev_min = MonotonyRegularization(eps=eps, eval_mode=True, method=PenalizationMethods.EVDECOMP)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2)
         assert are_equal(ev_min, w.min())
 
@@ -210,7 +208,7 @@ class TestEVComputation:
 
     @staticmethod
     @pytest.mark.parametrize('alpha', [0.0, 1.0, 2.0, 10.0, 20.0, 30.0])
-    def test_get_lambda_max_min(alpha):
+    def test_get_lambda_max_min(alpha: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
@@ -242,20 +240,25 @@ class TestEVComputation:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_onevector(alpha, eps):
+    def test_penalization_powermethod_onevector(alpha: float, eps: float):
         _niter = 1000
 
-        x = torch.randn((1, NDIM, 1), requires_grad=True)
-        w = torch.diag(torch.randn(NDIM))
+        x = torch.randn((1, NDIM, 1), requires_grad=True).double()
+        w = torch.diag(torch.randn(NDIM)).double()
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter,
+                                             power_iter_tol=1e-10)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_batchvector(alpha, eps):
+    def test_penalization_powermethod_batchvector(alpha: float, eps: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
@@ -263,7 +266,11 @@ class TestEVComputation:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2=}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
@@ -271,8 +278,8 @@ class TestEVComputation:
 class TestOptimizedPenalizationPowerMethod:
     @staticmethod
     def test_power_method():
-        x = torch.randn((BATCH_SIZE, NDIM, 1))
-        w = torch.diag(torch.randn(NDIM))
+        x = torch.randn((BATCH_SIZE, NDIM, 1)).double()
+        w = torch.diag(torch.randn(NDIM)).double()
         W = w.unsqueeze(0)
         operator = lambda x: torch.matmul(W, x)
         lambda_max = power_method(x, operator, max_iter=200, tol=1e-6, is_eval=True)
@@ -281,7 +288,7 @@ class TestOptimizedPenalizationPowerMethod:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod(alpha, eps):
+    def test_penalization_powermethod(alpha: float, eps: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, 1))
@@ -289,7 +296,11 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen=} {(eps - w.min()) ** 2}"
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
@@ -303,13 +314,17 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - 2 * w.min()}"
         assert are_equal(ev_min, w.min()), f"{ev_min} != {2 * w.min()}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_optpowermethod_random_symmetric(alpha, eps):
+    def test_penalization_optpowermethod_random_symmetric(alpha: float, eps: float):
         NDIM = 10
         _niter = 500
 
@@ -319,13 +334,17 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - all_ev.min()) ** 2)
         assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod(alpha, eps):
+    def test_penalization_powermethod_optpowermethod(alpha: float, eps: float):
         _niter = 500
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -333,15 +352,22 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=True,
-                                                                   max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=True,
+                                                     max_iter=_niter)(f, x)
         assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
         assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_grads(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_grads(alpha: float, eps: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -350,22 +376,29 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_(True)
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=False,
+                                             max_iter=_niter)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                   max_iters=_niter)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=False,
+                                                     max_iter=_niter)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
-        assert are_equal(grad_pm, grad_pm_opt), \
+        assert torch.isclose(grad_pm, grad_pm_opt, rtol=0.0, atol=FLOAT_TOL), \
             f"||gradP - gradRC|| // ||gradP|| = {torch.norm(grad_pm_opt - grad_pm) / torch.norm(grad_pm)}, " \
             f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_grads_percentclose(alpha, eps):
-        _niter = 1000
+    def test_penalization_powermethod_optpowermethod_grads_percentclose(alpha: float, eps: float):
+        _niter = 2000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
         w = torch.randn(NDIM, NDIM)
@@ -373,23 +406,30 @@ class TestOptimizedPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=False,
+                                             max_iter=_niter)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                   max_iters=_niter)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=False,
+                                                     max_iter=_niter)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
-        assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum() > grad_pm.nelement() * PERCENT_CLOSE, \
+        assert torch.isclose(grad_pm, grad_pm_opt, rtol=0.0, atol=FLOAT_TOL).sum() > grad_pm.nelement() * PERCENT_CLOSE, \
             f"||gradP - gradRC|| // ||gradP|| = {torch.norm(grad_pm_opt - grad_pm) / torch.norm(grad_pm)}, " \
-            f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
+            f"{are_equal(grad_pm, grad_pm_opt).sum()} / {grad_pm.nelement()}"
 
 
 class TestOptimizedNoAlphaPenalizationPowerMethod:
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_random_diag(alpha, eps):
+    def test_penalization_random_diag(alpha: float, eps: float):
         _niter = 500
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
@@ -397,8 +437,11 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
 
-        pen, ev_min = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
-                                                                   max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - w.min()}"
         assert are_equal(ev_min, w.min()), f"{ev_min} != {w.min()}"
 
@@ -414,30 +457,40 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         all_ev = get_neuralnet_jacobian_ev(f, x)
-        pen, ev_min = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
-                                                                   max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
         assert are_equal(pen, (eps - all_ev.min()) ** 2)
         assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_noalpha(alpha, eps):
-        _niter = 500
+    def test_penalization_powermethod_optpowermethod_noalpha(alpha: float, eps: float):
+        _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
         w = torch.randn(NDIM, NDIM)
         W = w.T @ w
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=True, max_iters=_niter)
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=True,
-                                                                           max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=True,
+                                             max_iter=_niter)(f, x)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=True,
+                                                     max_iter=_niter)(f, x)
         assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
         assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_noalpha_grads(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_noalpha_grads(alpha: float, eps: float):
         _niter = 2000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -446,12 +499,19 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=False,
+                                             max_iter=_niter)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                           max_iters=_niter)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=False,
+                                                     max_iter=_niter)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert are_equal(grad_pm, grad_pm_opt), \
@@ -461,7 +521,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_powermethod_optpowermethod_noalpha_grads_percentclose(alpha, eps):
+    def test_penalization_powermethod_optpowermethod_noalpha_grads_percentclose(alpha: float, eps: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -470,15 +530,22 @@ class TestOptimizedNoAlphaPenalizationPowerMethod:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         W.requires_grad_()
-        pen, ev_min = monotone_penalization_powermethod(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        pen, ev_min = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                             alpha=alpha,
+                                             eps=eps,
+                                             eval_mode=False,
+                                             max_iter=_niter)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
-        pen_opt, ev_min_opt = monotone_penalization_optpowermethod_noalpha(f, x, alpha=alpha, eps=eps, is_eval=False,
-                                                                           max_iters=_niter)
+        pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
+                                                     alpha=alpha,
+                                                     eps=eps,
+                                                     eval_mode=False,
+                                                     max_iter=_niter)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
-        assert torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL,
+        assert torch.isclose(grad_pm, grad_pm_opt, rtol=0.0,
                              atol=FLOAT_TOL).sum() > grad_pm.nelement() * PERCENT_CLOSE, \
             f"||gradP - gradRC|| // ||gradP|| = {torch.norm(grad_pm_opt - grad_pm) / torch.norm(grad_pm)}, " \
             f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
@@ -489,7 +556,7 @@ class TestMonotonyLearning:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
-    def test_learning_monotony_power(alpha, eps):
+    def test_learning_monotony_power(alpha: float, eps: float):
         _niter = 100
         _max_iter = 200
 
@@ -499,7 +566,11 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = monotone_penalization_powermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
+            pen, evs = MonotonyRegularization(method=PenalizationMethods.POWER,
+                                              alpha=alpha,
+                                              eps=eps,
+                                              eval_mode=False,
+                                              max_iter=_niter)(model, x)
             optim.zero_grad()
             pen.backward()
             optim.step()
@@ -509,7 +580,7 @@ class TestMonotonyLearning:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
-    def test_learning_monotony_poweropt(alpha, eps):
+    def test_learning_monotony_poweropt(alpha: float, eps: float):
         _niter = 200
         _max_iter = 500
 
@@ -519,7 +590,11 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = monotone_penalization_optpowermethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
+            pen, evs = MonotonyRegularization(method=PenalizationMethods.OPTPOWER,
+                                              alpha=alpha,
+                                              eps=eps,
+                                              eval_mode=False,
+                                              max_iter=_niter)(model, x)
             optim.zero_grad()
             pen.backward()
             optim.step()
@@ -529,7 +604,7 @@ class TestMonotonyLearning:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10], [0.1, 0.05]))
-    def test_learning_monotony_jacobian(alpha, eps):
+    def test_learning_monotony_jacobian(alpha: float, eps: float):
         _max_iter = 50
 
         model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearning.DEVICE)
@@ -538,7 +613,9 @@ class TestMonotonyLearning:
 
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = monotone_penalization_fulljacobian(model, x, alpha=alpha, eps=eps)
+            pen, evs = MonotonyRegularization(method=PenalizationMethods.EVDECOMP,
+                                              eps=eps,
+                                              eval_mode=False)(model, x)
             optim.zero_grad()
             pen.backward()
             optim.step()
@@ -554,10 +631,10 @@ class TestConstraintValuesWithTransformedConstraint:
     @pytest.mark.parametrize(["alpha", "eps", "method"],
                              itertools.product([10],
                                                [0.1, 0.05],
-                                               [monotone_penalization_powermethod,
-                                                monotone_penalization_optpowermethod,
-                                                monotone_penalization_fulljacobian]))
-    def test_values_equality(alpha: float, eps: float, method: Callable):
+                                               [PenalizationMethods.POWER,
+                                                PenalizationMethods.OPTPOWER,
+                                                PenalizationMethods.EVDECOMP]))
+    def test_values_equality(alpha: float, eps: float, method: PenalizationMethods):
         _niter = 200
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -568,8 +645,10 @@ class TestConstraintValuesWithTransformedConstraint:
         W = w.unsqueeze(0)
         f = lambda x: torch.matmul(W, x)
         f2 = lambda x: 2 * torch.matmul(W, x) - x
-        pen1, ev_min1 = method(f2, x, alpha=alpha, eps=-1 + eps, is_eval=False, max_iters=_niter)
-        pen2, ev_min2 = transform_contraint(method)(f, x, alpha=alpha, eps=eps, is_eval=False, max_iters=_niter)
+        method_ = MonotonyRegularizationShift(method=method, alpha=alpha, eps=eps, eval_mode=True, max_iter=_niter)
+        method_2 = MonotonyRegularization(method=method, alpha=alpha, eps=-1 + eps, eval_mode=True, max_iter=_niter)
+        pen1, ev_min1 = method_2(f2, x)
+        pen2, ev_min2 = method_(f, x)
         assert torch.isclose(pen1, pen2, rtol=FLOAT_TOL).all()
         assert torch.isclose(ev_min1, ev_min2, rtol=FLOAT_TOL).all()
         assert torch.isclose(real_evs1[0], (ev_min2 + 1) / 2, rtol=FLOAT_TOL).all()
@@ -583,20 +662,20 @@ class TestMonotonyLearningWithTransformedConstraint:
     @pytest.mark.parametrize(["alpha", "eps", "method"],
                              itertools.product([10],
                                                [0.1, 0.05],
-                                               [monotone_penalization_powermethod,
-                                                monotone_penalization_optpowermethod,
-                                                monotone_penalization_fulljacobian]))
-    def test_learning_monotony_power(alpha: float, eps: float, method: Callable):
+                                               [PenalizationMethods.POWER,
+                                                PenalizationMethods.OPTPOWER,
+                                                PenalizationMethods.EVDECOMP]))
+    def test_learning_monotony_power(alpha: float, eps: float, method: PenalizationMethods):
         _niter = 100
         _max_iter = 200
 
         model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearning.DEVICE)
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         optim.zero_grad()
-        pmethod = transform_contraint(method)
+        pmethod = MonotonyRegularizationShift(method=method, alpha=alpha, eps=eps, max_iter=_niter)
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearning.DEVICE)
-            pen, evs = pmethod(model, x, alpha=alpha, eps=eps, max_iters=_niter)
+            pen, evs = pmethod(model, x)
             optim.zero_grad()
             pen.backward()
             optim.step()

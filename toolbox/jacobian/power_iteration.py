@@ -36,6 +36,8 @@ def power_method(x: torch.Tensor,
     :param return_vector: Either to return the eigenvector with the eigenvalue or only the eigenvalue.
     :return: (Eigenvectors, Eigenvalues) if return_vector is True, else Eigenvalue
     """
+    logger.debug(f"Power method with tol: {tol} and max_iter: {max_iter}")
+
     # Make sure that the operator is symmetric else it doesn't yield a correct result.
     input_shape = x.shape  # First dimension is always considered to be batch
     u = batch_normalize_vector(torch.randn_like(x))
