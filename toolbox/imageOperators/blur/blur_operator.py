@@ -135,6 +135,7 @@ class BlurConvolution(Operator):
         global DID_LOG_ONCE
         # Define Gaussian Kernel
         self.std = s
+        self.type = type_
         self.kernel = get_kernel(ksize, type_, self.std)
         self.kernel_size = self.kernel.shape[0]
 
@@ -155,6 +156,9 @@ class BlurConvolution(Operator):
 
     def rmatvec(self, x: torch.Tensor) -> torch.Tensor:
         return self.blurr(x, self.kernel.view(1, 1, self.kernel_size, self.kernel_size))
+
+    def __repr__(self):
+        return f"BlurConvolution(kernel_size={self.kernel_size}, type_={self.type}, std={self.std})"
 
 
 class ZeroOperator(Operator):
