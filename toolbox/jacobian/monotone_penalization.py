@@ -22,7 +22,7 @@ class PenalizationMethods(StrEnum):
 
 def penalization(lambda_min, eps, use_relu=True):
     if not use_relu:
-        return torch.maximum(-1 * lambda_min, torch.ones_like(lambda_min) - eps).max()
+        return torch.maximum(-1 * lambda_min, torch.zeros_like(lambda_min) - eps).max()
     else:
         return torch.relu(eps - lambda_min).max() ** 2
 
@@ -34,7 +34,8 @@ class MonotonyRegularization(nn.Module):
                  alpha: float = 10.0,
                  max_iter: int = 200,
                  power_iter_tol: float = 1e-5,
-                 eval_mode: bool = False):
+                 eval_mode: bool = False,
+                 use_relu_penalization: bool = False):
         super().__init__()
         self.method = method
         if isinstance(self.method, str):
@@ -44,6 +45,7 @@ class MonotonyRegularization(nn.Module):
         self.max_iters = max_iter
         self.eval = eval_mode
         self.power_iter_tol = power_iter_tol
+        self.use_relu = use_relu_penalization
         logger.debug(f"Using {self.method.name} for computing regularisation. Tolerance for PI: {self.power_iter_tol}")
 
     def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -61,7 +63,7 @@ class MonotonyRegularization(nn.Module):
         all_ev = get_neuralnet_jacobian_ev(net, x)
         if self.eval:
             all_ev.detach_()
-        return penalization(all_ev.min(), self.eps), all_ev.min().detach()
+        return penalization(all_ev.min(), self.eps, use_relu=self.use_relu), all_ev.min().detach()
 
     def _penalization_powermethod(self,
                                   net: Callable,
@@ -84,7 +86,7 @@ class MonotonyRegularization(nn.Module):
                                                self.max_iters,
                                                tol=self.power_iter_tol,
                                                is_eval=self.eval)
-        return penalization(lambda_min, self.eps), lambda_min.min().detach()
+        return penalization(lambda_min, self.eps, self.use_relu), lambda_min.min().detach()
 
     def _penalization_optpowermethod(self,
                                      net: Callable,
@@ -108,7 +110,7 @@ class MonotonyRegularization(nn.Module):
         rayleigh_coeff = self.alpha - torch.sum(vectors * operator(vectors), dim=1) / torch.sum(vectors * vectors,
                                                                                                 dim=1)
         lambda_min = rayleigh_coeff.min()
-        return penalization(lambda_min, self.eps), lambda_min.min().detach()
+        return penalization(lambda_min, self.eps, self.use_relu), lambda_min.min().detach()
 
     def _penalization_optpowermethod_noalpha(self,
                                              net: Callable,
@@ -168,8 +170,9 @@ class MonotonyRegularizationShift(MonotonyRegularization):
                  alpha: float = 10.0,
                  max_iter: int = 200,
                  power_iter_tol: float = 1e-5,
-                 eval_mode: bool = False):
-        super().__init__(method, -1 + eps, alpha, max_iter, power_iter_tol, eval_mode)
+                 eval_mode: bool = False,
+                 use_relu_penalization: bool = False):
+        super().__init__(method, -1 + eps, alpha, max_iter, power_iter_tol, eval_mode, use_relu_penalization)
 
     @staticmethod
     def shift_model(model):
