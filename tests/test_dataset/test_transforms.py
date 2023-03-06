@@ -1,14 +1,13 @@
 from pathlib import Path
 
 import pytest
-import torch
 import torchvision.transforms as ttransforms
-from torchvision.transforms import functional as F
 from PIL import Image
+from torchvision.transforms import functional as F
 
+from tests.parameters import are_equal
 from toolbox.dataset import Random90Rotation, RandomVerticalFlip, RandomHorizontalFlip, get_transforms, Compose, \
     AvailableTransforms, RandomCrop, CenterCrop
-from tests.parameters import are_equal
 
 """
 Test:
