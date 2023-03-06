@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -89,13 +90,14 @@ class TestImageGradient:
 
 class TestBlurOperators:
     @staticmethod
-    @pytest.mark.parametrize('std', [1, 1.5, 2, 2.5, 3, 5])
+    @pytest.mark.parametrize('std', [0.5, 1, 1.5, 2, 2.5, 3, 5])
     def test_fft_blur(std):  # There's a problem with image that have a pair dimension.
         _, x = get_clean_image(Path(__file__).parent / "chelseaColor.png")
         blurr = GaussianBlurFFT(31, std)
         blurred = blurr @ x
-        np_blur = torch.from_numpy(gaussian(x, sigma=std, mode="nearest"))
-        assert are_equal(np_blur, blurred)
+        np_blur = std * math.sqrt(2 * math.pi) * torch.from_numpy(
+            gaussian(x.numpy(), sigma=std, mode="constant", cval=0, preserve_range=True))
+        assert are_equal(np_blur, blurred), (np_blur - blurred).abs().max()
 
     @staticmethod
     @pytest.mark.parametrize('std', [0.5, 1, 1.5, 2, 2.5, 3])
@@ -105,7 +107,8 @@ class TestBlurOperators:
         blurred = blurr @ x
         blurred_t = blurr.T @ x
         for i in range(BATCH_SIZE):
-            np_blur = torch.from_numpy(gaussian(x[i], sigma=std, mode="nearest"))
+            np_blur = std * math.sqrt(2 * math.pi) * torch.from_numpy(
+                gaussian(x[i].numpy(), sigma=std, mode="constant", cval=0, preserve_range=True))
             assert are_equal(np_blur, blurred[i])
             assert are_equal(np_blur, blurred_t[i])
         assert blurred.ndim == 4
@@ -117,7 +120,8 @@ class TestBlurOperators:
         blurr = BlurConvolution(31, Kernels.GAUSSIAN, std_)
         blurred = blurr @ x
         assert blurred.ndim == 3
-        np_blur = torch.from_numpy(gaussian(x, sigma=std_, mode="nearest"))
+        np_blur = std_ * math.sqrt(2 * math.pi) * torch.from_numpy(
+            gaussian(x.numpy(), sigma=std_, mode="constant", preserve_range=True))
         assert are_equal(np_blur, blurred)
 
     @staticmethod
