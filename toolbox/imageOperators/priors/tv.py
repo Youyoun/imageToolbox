@@ -1,13 +1,13 @@
 import torch
 
-from .Function import Function
 from ..im_gradient import Gradient, Directions
+from ...base_classes import Regularization
 from ...utils import get_module_logger
 
 logger = get_module_logger(__name__)
 
 
-class SmoothTotalVariation(Function):
+class SmoothTotalVariation(Regularization):
     def __init__(self, smoothing_epsilon: float = 1e-6):
         self.epsilon_tv = smoothing_epsilon
         logger.info(f"Epsilon for smoothed total variation is set to {self.epsilon_tv}")

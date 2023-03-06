@@ -57,18 +57,31 @@ class Fidelity(Function, ABC):
     def grad(self, x: torch.Tensor, y: torch.Tensor):
         raise NotImplementedError()
 
+    def prox(self, x: torch.Tensor, tau: float):
+        raise FunctionNotDefinedError("Prox function not defined")
+
 
 class Regularization(Function, ABC):
+    @abstractmethod
     def f(self, x: torch.Tensor):
         raise NotImplementedError()
 
+    @abstractmethod
     def grad(self, x: torch.Tensor):
         raise NotImplementedError()
 
+    def prox(self, x: torch.Tensor, tau: float):
+        raise FunctionNotDefinedError("Prox function not defined")
+
 
 class ProximityOp(Function, ABC):
+    @abstractmethod
     def f(self, x: torch.Tensor, tau: float):
         raise NotImplementedError()
 
+    def grad(self, *args, **kwargs):
+        raise FunctionNotDefinedError("Gradient function not defined")
+
+    @abstractmethod
     def prox(self, x: torch.Tensor, tau: float):
         raise NotImplementedError()

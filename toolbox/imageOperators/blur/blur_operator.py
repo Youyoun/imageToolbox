@@ -9,6 +9,7 @@ import torchvision.transforms as t_transforms
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 
+from ...base_classes import Operator
 from ...utils import get_module_logger, StrEnum
 
 logger = get_module_logger(__name__)
@@ -40,34 +41,6 @@ kernel_type_img_map = {
     Kernels.TYPE_G: CURRENT_FILE_PATH / "kernels/kernel7.png",
     Kernels.TYPE_H: CURRENT_FILE_PATH / "kernels/kernel8.png"
 }
-
-
-class Operator:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def matvec(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplemented()
-
-    def rmatvec(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplemented()
-
-    def __matmul__(self, x: torch.Tensor) -> torch.Tensor:
-        return self.matvec(x)
-
-    def transpose(self):
-        return TransposedOperator(self)
-
-    T = property(transpose)
-
-
-class TransposedOperator(Operator):
-    def __init__(self, operator: Operator):
-        super().__init__()
-        self.op = operator
-
-    def __matmul__(self, x: torch.Tensor) -> torch.Tensor:
-        return self.op.rmatvec(x)
 
 
 class IdentityOperator(Operator):

@@ -1,10 +1,10 @@
 import torch
 
-from .Function import Function
-from ..blur.blur_operator import Operator
+from ...base_classes import Regularization
+from ...base_classes.basic_linear_operator import Operator
 
 
-class Tychonov(Function):
+class Tychonov(Regularization):
     def __init__(self, op: Operator, mean: float = 0.0):
         self.L = op
         self.mean = mean

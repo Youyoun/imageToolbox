@@ -10,28 +10,28 @@ logger = get_module_logger(__name__)
 
 
 def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
-                           grad_xF: Callable,
-                           grad_xR: Callable,
+                           fidelity_gradient: Callable,
+                           regularization_gradient: Callable,
                            gamma: float,
                            lambda_: float,
                            use_armijo: bool = False,
                            max_iter: int = 1000,
                            real_x: np.ndarray = None,
-                           regul_function: Callable = None,
+                           regularization_function: Callable = None,
                            fidelity_function: Callable = None,
-                           do_compute_metrics: bool = True) -> (np.ndarray, MetricsDictionary):
+                           do_compute_metrics: bool = True) -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
     """
     Tseng's gradient descent algorithm.
     :param input_vector: Input vector.
-    :param grad_xF: Gradient of the fidelity term. Must have the signature grad_xF(x, y) where x is the input vector
+    :param fidelity_gradient: Gradient of the fidelity term. Must have the signature grad_xF(x, y) where x is the input vector
         and y is the fidelity term.
-    :param grad_xR: Gradient of the regularization term. Must have the signature grad_xR(x) where x is the input vector.
+    :param regularization_gradient: Gradient of the regularization term. Must have the signature grad_xR(x) where x is the input vector.
     :param gamma: Step size.
     :param lambda_: Regularization parameter.
     :param use_armijo: If True, use Armijo rule to find the step size. gamma is used as the initial step size.
     :param max_iter: Maximum number of iterations.
     :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
-    :param regul_function: Regularization function. Must have the signature regul_function(x, gamma)
+    :param regularization_function: Regularization function. Must have the signature regul_function(x, gamma)
         where x is the input vector and gamma is the step size.
     :param fidelity_function: Fidelity function. Must have the signature fidelity_function(x, y)
     :param do_compute_metrics: If True, compute metrics.
@@ -44,7 +44,13 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
     logger.debug("Computing metrics..." if do_compute_metrics else "Not computing metrics...")
 
     def operator(x):
-        return grad_xF(x, y=input_vector) + lambda_ * grad_xR(x)
+        """
+        Operator to apply to get the gradient of the fidelity term and the regularization term.
+        Operator = \nabla F + \lambda \nabla R
+        :param x: Input vector.
+        :return: Gradient of the fidelity term and the regularization term.
+        """
+        return fidelity_gradient(x, y=input_vector) + lambda_ * regularization_gradient(x)
 
     armijo = None
     if use_armijo:
@@ -69,8 +75,8 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
             continue
         else:
             R_x, F_x = 0, 0
-            if regul_function is not None:
-                R_x = regul_function(xk, lambda_)
+            if regularization_function is not None:
+                R_x = regularization_function(xk, lambda_)
             if fidelity_function is not None:
                 F_x = fidelity_function(xk, input_vector)
             metrics.add(

@@ -1,9 +1,9 @@
 import torch
 
-from .Function import Function
+from ...base_classes import Regularization
 
 
-class NoRegularisation(Function):
+class NoRegularisation(Regularization):
     @staticmethod
     def f(x: torch.Tensor) -> torch.Tensor:
         return torch.zeros_like(x).sum()
