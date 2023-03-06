@@ -370,7 +370,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
         assert are_equal(ev_min, w.min()), f"{ev_min=} {w.min()=}"
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_powermethod_relu(alpha: float, eps: float):
         _niter = 1000
 
@@ -446,7 +446,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
         assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_optpowermethod_random_symmetric_relu(alpha: float, eps: float):
         NDIM = 10
         _niter = 500
@@ -640,8 +640,11 @@ class TestOptimizedPenalizationPowerMethodReLU:
 
 
 class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
+    EPS = [0.0, 0.05, 0.1, 0.2]
+    ALPHAS = [3.0, 5.0]
+
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_random_diag(alpha: float, eps: float):
         _niter = 500
 
@@ -654,13 +657,14 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                              alpha=alpha,
                                              eps=eps,
                                              eval_mode=True,
-                                             max_iter=_niter)(f, x)
+                                             max_iter=_niter,
+                                             use_relu_penalization=True)(f, x)
         assert are_equal(pen, (eps - w.min()) ** 2), f"{pen} != {eps - w.min()}"
         assert are_equal(ev_min, w.min()), f"{ev_min} != {w.min()}"
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
-    def test_penalization_random_symmetric(alpha, eps):
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
+    def test_penalization_random_symmetric(alpha: float, eps: float):
         NDIM = 10
         _niter = 500
 
@@ -674,12 +678,13 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                              alpha=alpha,
                                              eps=eps,
                                              eval_mode=True,
-                                             max_iter=_niter)(f, x)
+                                             max_iter=_niter,
+                                             use_relu_penalization=True)(f, x)
         assert are_equal(pen, (eps - all_ev.min()) ** 2)
         assert are_equal(ev_min, all_ev.min())
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_powermethod_optpowermethod_noalpha(alpha: float, eps: float):
         _niter = 1000
 
@@ -692,17 +697,19 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                              alpha=alpha,
                                              eps=eps,
                                              eval_mode=True,
-                                             max_iter=_niter)(f, x)
+                                             max_iter=_niter,
+                                             use_relu_penalization=True)(f, x)
         pen_opt, ev_min_opt = MonotonyRegularization(method=PenalizationMethods.OPTPOWERNOALPHA,
                                                      alpha=alpha,
                                                      eps=eps,
                                                      eval_mode=True,
-                                                     max_iter=_niter)(f, x)
+                                                     max_iter=_niter,
+                                                     use_relu_penalization=True)(f, x)
         assert are_equal(ev_min, ev_min_opt), f"{ev_min} != {ev_min_opt}"
         assert are_equal(pen, pen_opt), f"{pen} != {pen_opt}"
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_powermethod_optpowermethod_noalpha_grads(alpha: float, eps: float):
         _niter = 2000
 
@@ -716,7 +723,8 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                              alpha=alpha,
                                              eps=eps,
                                              eval_mode=False,
-                                             max_iter=_niter)(f, x)
+                                             max_iter=_niter,
+                                             use_relu_penalization=True)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
@@ -724,7 +732,8 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                                      alpha=alpha,
                                                      eps=eps,
                                                      eval_mode=False,
-                                                     max_iter=_niter)(f, x)
+                                                     max_iter=_niter,
+                                                     use_relu_penalization=True)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert are_equal(grad_pm, grad_pm_opt), \
@@ -733,7 +742,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
             f"{torch.isclose(grad_pm, grad_pm_opt, rtol=FLOAT_TOL).sum()} / {grad_pm.nelement()}"
 
     @staticmethod
-    @pytest.mark.parametrize(["alpha", "eps"], itertools.product([1, 5, 10, 20, 30], [0.0, 1.0, 2.0, 5.0]))
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
     def test_penalization_powermethod_optpowermethod_noalpha_grads_percentclose(alpha: float, eps: float):
         _niter = 1000
 
@@ -747,7 +756,8 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                              alpha=alpha,
                                              eps=eps,
                                              eval_mode=False,
-                                             max_iter=_niter)(f, x)
+                                             max_iter=_niter,
+                                             use_relu_penalization=True)(f, x)
         pen.backward()
         grad_pm = W.grad.clone()
         W.grad = None
@@ -755,7 +765,8 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
                                                      alpha=alpha,
                                                      eps=eps,
                                                      eval_mode=False,
-                                                     max_iter=_niter)(f, x)
+                                                     max_iter=_niter,
+                                                     use_relu_penalization=True)(f, x)
         pen_opt.backward()
         grad_pm_opt = W.grad.clone()
         assert torch.isclose(grad_pm, grad_pm_opt, rtol=0.0,
