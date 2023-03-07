@@ -2,7 +2,7 @@ from typing import Callable, Dict
 
 import torch
 
-from ..base_classes import BasicSolver, Function, FunctionNotDefinedError, GenericFunction
+from ..base_classes import BasicSolver, FunctionNotDefinedError, GenericFunction, Fidelity, ProximityOp
 from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
 
 
@@ -10,7 +10,7 @@ class ProximalDescent(BasicSolver):
     """
     Proximal descent algorithm. See https://en.wikipedia.org/wiki/Proximal_gradient_methods_for_learning
     :param fidelity: Fidelity function. Must have the signature fidelity_function(x, y)
-    :param regularization: Regularization function. Must have the signature regul_function(x, gamma)
+    :param prox: Regularization function. Must have the signature regul_function(x, gamma)
     :param gamma: Step size
     :param lambda_: Regularization parameter
     :param max_iter: Maximum number of iterations
@@ -18,15 +18,15 @@ class ProximalDescent(BasicSolver):
     """
 
     def __init__(self,
-                 fidelity: Function,
-                 regularization: Function,
+                 fidelity: Fidelity,
+                 prox: ProximityOp,
                  gamma: float,
-                 lambda_: float = 1.0,
+                 lambda_: float,
                  max_iter: int = 1000,
                  do_compute_metrics: bool = True):
         super().__init__()
         self.fidelity = fidelity
-        self.regularization = regularization
+        self.prox = prox
         self.gamma = gamma
         self.lambda_ = lambda_
         self.max_iter = max_iter
@@ -49,7 +49,7 @@ class ProximalDescent(BasicSolver):
         :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
         """
         try:
-            r_x = self.regularization.f(xk, self.lambda_)
+            r_x = self.prox.f(xk, self.lambda_)
         except FunctionNotDefinedError:
             r_x = 0.0
         try:
@@ -81,8 +81,8 @@ class ProximalDescent(BasicSolver):
             self.metrics = MetricsDictionary()
         for step in range(self.max_iter):
             # Prox_{\gamma R} (x_k - \gamma \nabla F(x_k))
-            xk = self.regularization.prox(xk - self.gamma * self.fidelity.grad(xk, y=input_vector),
-                                          self.gamma * self.lambda_)
+            xk = self.prox.prox(xk - self.gamma * self.fidelity.grad(xk, y=input_vector),
+                                self.gamma * self.lambda_)
             if self.do_compute_metrics:
                 self.metrics.add(self.compute_metrics(xk, xk_old, input_vector, real_x))
             if compute_relative_difference(xk, xk_old, input_vector) <= _tol:

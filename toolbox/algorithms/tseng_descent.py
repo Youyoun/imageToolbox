@@ -1,12 +1,138 @@
-from typing import Callable, Union
+from typing import Callable, Union, Dict
 
 import numpy as np
 import torch
 
+from ..base_classes import BasicSolver, FunctionNotDefinedError, Fidelity, Regularization, GenericFunction
 from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
 from ..utils import get_module_logger
 
 logger = get_module_logger(__name__)
+
+
+class TsengOperator(Fidelity):
+    """
+    Operator for Tseng's gradient descent algorithm.
+    :param fid: Fidelity function.
+    :param reg: Regularization function.
+    :param lambda_: Regularization parameter.
+    """
+
+    def __init__(self, fid: Fidelity, reg: Regularization, lambda_: float = 1.0):
+        super().__init__()
+        self.fid = fid
+        self.reg = reg
+        self.lambda_ = lambda_
+
+    def f(self, x: torch.Tensor, y: torch.Tensor):
+        """
+        F(x) + \lambda * R(x)
+        """
+        return self.fid.f(x, y) + self.lambda_ * self.reg.f(x)
+
+    def grad(self, x: torch.Tensor, y: torch.Tensor):
+        """
+        \nabla F(x) + \lambda * \nabla R(x)
+        """
+        return self.fid.grad(x, y) + self.lambda_ * self.reg.grad(x)
+
+
+class TsengDescent(BasicSolver):
+    """
+    Tseng's gradient descent algorithm.
+    """
+
+    def __init__(self,
+                 fidelity: Fidelity,
+                 regularization: Regularization,
+                 gamma: float,
+                 lambda_: float = 1.0,
+                 max_iter: int = 1000,
+                 use_armijo: bool = True,
+                 do_compute_metrics: bool = True):
+        super().__init__()
+        self.fidelity = fidelity
+        self.regularization = regularization
+        self.operator = TsengOperator(self.fidelity, self.regularization, lambda_)
+
+        self.gamma = gamma
+        self.lambda_ = lambda_
+        self.max_iter = max_iter
+        self.use_armijo = use_armijo
+        self.do_compute_metrics = do_compute_metrics
+
+        self.metrics = None
+        if self.do_compute_metrics:
+            self.metrics = MetricsDictionary()
+
+    def compute_metrics(self,
+                        xk: torch.Tensor,
+                        xk_old: torch.Tensor,
+                        input_vector: torch.Tensor,
+                        real_x: torch.Tensor) -> Dict[str, float]:
+        """
+        Compute metrics.
+        :param xk: Current iterate.
+        :param xk_old: Previous iterate.
+        :param input_vector: Input vector.
+        :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
+        """
+        try:
+            r_x = self.regularization.f(xk)
+        except FunctionNotDefinedError:
+            r_x = 0.0
+        try:
+            f_x = self.fidelity.f(xk, y=input_vector)
+        except FunctionNotDefinedError:
+            f_x = 0.0
+
+        return {
+            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
+            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
+            "R(x_{k+1})": r_x,
+            "F(x_{k+1})": f_x,
+            "F(x_{k+1}) + \\lambda R(x_{k+1})": f_x + self.lambda_ * r_x,
+            "SNR": SNR(xk),
+        }
+
+    def solve(self,
+              input_vector: torch.Tensor,
+              real_x: torch.Tensor = None, ) -> (torch.Tensor, MetricsDictionary):
+        """
+        Tseng's gradient descent algorithm.
+        :param input_vector: Input vector.
+        :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
+        :return: Last iterate and metrics dictionary.
+        """
+        _tol = 1e-8
+        logger.info("Running Tseng's gradient descent algorithm...")
+        logger.debug(f"Parameters: gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}")
+        logger.debug(f"Input vector shape: {input_vector.shape}")
+
+        armijo = None
+        gamma = self.gamma
+        if self.use_armijo:
+            armijo = GammaSearch(self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False)
+
+        xk_old = input_vector.clone()
+        xk = xk_old
+        self.metrics = MetricsDictionary()
+        for step in range(self.max_iter):
+            if armijo is not None:
+                gamma = armijo.run_search_get_gamma(xk, y=input_vector)
+            # Update (one step)
+            ak = self.operator.grad(xk, y=input_vector)
+            zk = xk - gamma * ak
+            xk = zk - gamma * (self.operator.grad(zk, y=input_vector) - ak)
+
+            # Compute metrics
+            if self.do_compute_metrics:
+                self.metrics.add(self.compute_metrics(xk, xk_old, input_vector, real_x))
+            if compute_relative_difference(xk, xk_old, input_vector) <= _tol:
+                print(f"Descent reached tolerance={_tol} at step {step}")
+                break
+            xk_old = xk.clone()
+        return xk, self.metrics
 
 
 def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
@@ -37,71 +163,16 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
     :param do_compute_metrics: If True, compute metrics.
     :return: Last iterate and metrics dictionary.
     """
-    _tol = 1e-8
-    logger.info("Running Tseng's gradient descent algorithm...")
-    logger.debug(f"Parameters: gamma={gamma}, lambda={lambda_}, use_armijo={use_armijo}, max_iter={max_iter}")
-    logger.debug(f"Input vector shape: {input_vector.shape}")
-    logger.debug("Computing metrics..." if do_compute_metrics else "Not computing metrics...")
+    fidelity = GenericFunction(fidelity_function, fidelity_gradient, None)
+    regul = GenericFunction(regularization_function, regularization_gradient, None)
 
-    def operator(x):
-        """
-        Operator to apply to get the gradient of the fidelity term and the regularization term.
-        Operator = \nabla F + \lambda \nabla R
-        :param x: Input vector.
-        :return: Gradient of the fidelity term and the regularization term.
-        """
-        return fidelity_gradient(x, y=input_vector) + lambda_ * regularization_gradient(x)
-
-    armijo = None
-    if use_armijo:
-        armijo = GammaSearch(operator, sigma=gamma, gamma_min=1e-6, reset_each_search=False)
-
-    if isinstance(input_vector, np.ndarray):
-        xk_old = input_vector.copy()
-    else:
-        xk_old = input_vector.clone()
-    xk = xk_old
-    metrics = MetricsDictionary()
-    for step in range(max_iter):
-        if armijo is not None:
-            gamma = armijo.run_search_get_gamma(xk, y=input_vector)
-        # Update (one step)
-        ak = operator(xk)
-        zk = xk - gamma * ak
-        xk = zk - gamma * (operator(zk) - ak)
-
-        # Compute metrics
-        if not do_compute_metrics:
-            continue
-        else:
-            R_x, F_x = 0, 0
-            if regularization_function is not None:
-                R_x = regularization_function(xk, lambda_)
-            if fidelity_function is not None:
-                F_x = fidelity_function(xk, input_vector)
-            metrics.add(
-                {
-                    "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
-                    "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
-                    "R(x_{k+1})": R_x,
-                    "F(x_{k+1})": F_x,
-                    "F(x_{k+1}) + \\lambda R(x_{k+1})": F_x + lambda_ * R_x,
-                    "SNR": SNR(xk),
-                }
-            )
-            if metrics["||x_{k+1} - x_k||_2 / ||y||_2"][-1] <= _tol:
-                print(f"Descent reached tolerance={_tol} at step {step}")
-                break
-            if isinstance(input_vector, np.ndarray):
-                xk_old = xk.copy()
-            else:
-                xk_old = xk.clone()
-    return xk, metrics
+    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics)
+    return solver.solve(input_vector, real_x)
 
 
 class GammaSearch:
     def __init__(self,
-                 operator: Callable,
+                 operator: TsengOperator,
                  theta: float = 0.9,
                  beta: float = 0.8,
                  sigma: float = 1,
@@ -127,7 +198,7 @@ class GammaSearch:
         self.gamma_min = gamma_min
         logger.debug(f"Armijo rule parameters set to θ={theta}, β={beta}, σ={sigma}")
 
-        self.grad_op = operator
+        self.operator = operator
         self.power = 0.0
         self.projection = projection
         if self.projection is None:
@@ -165,16 +236,16 @@ class GammaSearch:
 
         while True:
             # A(x_k) = \nabla F(x_k, y) + \lambda \nabla R(x_k)
-            nabla_f = self.grad_op(x)
+            nabla_f = self.operator.grad(x, y)
 
             # proj_C(x_k - \gamma A(x_k)
             Zc = self.projection(x - self.gamma * nabla_f)
 
             # \gamma ||A(Z_C(x_k, y)) - A(x_k)||
-            diff_op = self.gamma * np.linalg.norm((self.grad_op(Zc) - nabla_f).flatten(), ord=2)
+            diff_op = self.gamma * torch.linalg.norm((self.operator.grad(Zc, y) - nabla_f).flatten(), ord=2)
 
             # \theta || Z_C(x_k, \gamma) - x_k||
-            diff_x = self.theta * np.linalg.norm((Zc - x).flatten(), ord=2)
+            diff_x = self.theta * torch.linalg.norm((Zc - x).flatten(), ord=2)
 
             if diff_op <= diff_x:
                 break
