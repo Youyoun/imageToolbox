@@ -1,9 +1,7 @@
-from abc import ABC
-
 import torch
 
 
-class Operator(ABC):
+class Operator:
     def __init__(self, *args, **kwargs):
         pass
 
