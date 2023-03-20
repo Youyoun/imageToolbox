@@ -3,7 +3,8 @@ from typing import Callable, Union, Dict
 import numpy as np
 import torch
 
-from ..base_classes import BasicSolver, FunctionNotDefinedError, Fidelity, Regularization, GenericFunction
+from .proj_op import Identity
+from ..base_classes import BasicSolver, FunctionNotDefinedError, Fidelity, Regularization, GenericFunction, ProximityOp
 from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
 from ..utils import get_module_logger
 
@@ -49,11 +50,13 @@ class TsengDescent(BasicSolver):
                  lambda_: float = 1.0,
                  max_iter: int = 1000,
                  use_armijo: bool = True,
-                 do_compute_metrics: bool = True):
+                 do_compute_metrics: bool = True,
+                 indicator_fn: ProximityOp = Identity()):
         super().__init__()
         self.fidelity = fidelity
         self.regularization = regularization
         self.operator = TsengOperator(self.fidelity, self.regularization, lambda_)
+        self.indicator = indicator_fn
 
         self.gamma = gamma
         self.lambda_ = lambda_
@@ -122,8 +125,8 @@ class TsengDescent(BasicSolver):
                 gamma = armijo.run_search_get_gamma(xk, y=input_vector)
             # Update (one step)
             ak = self.operator.grad(xk, y=input_vector)
-            zk = xk - gamma * ak
-            xk = zk - gamma * (self.operator.grad(zk, y=input_vector) - ak)
+            zk = self.indicator.prox(xk - gamma * ak)
+            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=input_vector) - ak))
 
             # Compute metrics
             if self.do_compute_metrics:
@@ -145,7 +148,8 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
                            real_x: np.ndarray = None,
                            regularization_function: Callable = None,
                            fidelity_function: Callable = None,
-                           do_compute_metrics: bool = True) -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
+                           do_compute_metrics: bool = True,
+                           indicator: ProximityOp = Identity()) -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
     """
     Tseng's gradient descent algorithm.
     :param input_vector: Input vector.
@@ -161,12 +165,13 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
         where x is the input vector and gamma is the step size.
     :param fidelity_function: Fidelity function. Must have the signature fidelity_function(x, y)
     :param do_compute_metrics: If True, compute metrics.
+    :param indicator: Indicator function (Identity if no constraint on interval).
     :return: Last iterate and metrics dictionary.
     """
     fidelity = GenericFunction(fidelity_function, fidelity_gradient, None)
     regul = GenericFunction(regularization_function, regularization_gradient, None)
 
-    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics)
+    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics, indicator)
     return solver.solve(input_vector, real_x)
 
 
@@ -178,7 +183,7 @@ class GammaSearch:
                  sigma: float = 1,
                  gamma_min: float = 1e-4,
                  reset_each_search: bool = False,
-                 projection: Callable = None):
+                 projection: ProximityOp = None):
         """
         Gamma search for the Tseng's gradient descent algorithm. The search is based on the Armijo rule. The search is
         performed by decreasing the step size until the Armijo rule is satisfied. The step size is decreased by a factor
@@ -202,7 +207,7 @@ class GammaSearch:
         self.power = 0.0
         self.projection = projection
         if self.projection is None:
-            self.projection = lambda x: x
+            self.projection = Identity()
         self.reset_each_search = reset_each_search
         logger.debug(f"Armijo is {'not' if not self.reset_each_search else ''} reset after each iteration.")
 
@@ -239,7 +244,7 @@ class GammaSearch:
             nabla_f = self.operator.grad(x, y)
 
             # proj_C(x_k - \gamma A(x_k)
-            Zc = self.projection(x - self.gamma * nabla_f)
+            Zc = self.projection.prox(x - self.gamma * nabla_f)
 
             # \gamma ||A(Z_C(x_k, y)) - A(x_k)||
             diff_op = self.gamma * torch.linalg.norm((self.operator.grad(Zc, y) - nabla_f).flatten(), ord=2)
