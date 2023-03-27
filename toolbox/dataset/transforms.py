@@ -81,11 +81,25 @@ class Random90Rotation(Transform):
 
 
 class RandomCrop(Transform):
-    def __init__(self, size: int):
+    def __init__(self, size: int, pad_if_needed=False, fill=0, padding_mode="constant"):
         self.size = size
+        self.pad_if_needed = pad_if_needed
+        self.fill = fill
+        self.padding_mode = padding_mode
 
     def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        _, height, width = image.shape
+        if self.pad_if_needed and height < self.size:
+            padding = [0, self.size - height]
+            image = F.pad(image, padding, self.fill, self.padding_mode)
+            target = F.pad(target, padding, self.fill, self.padding_mode)
+        if self.pad_if_needed and width < self.size:
+            padding = [self.size - width, 0]
+            image = F.pad(image, padding, self.fill, self.padding_mode)
+            target = F.pad(target, padding, self.fill, self.padding_mode)
         crop_params = T.RandomCrop.get_params(image, (self.size, self.size))
+
         image = F.crop(image, *crop_params)
         target = F.crop(target, *crop_params)
         return image, target
