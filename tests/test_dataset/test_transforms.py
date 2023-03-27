@@ -120,3 +120,11 @@ class TestTransforms:
     def test_center_crop(size):
         cat_t, flipped_cat_t, flipped_cat_t_2 = TestTransforms.load_image_and_transform(CenterCrop(size=size))
         assert are_equal(flipped_cat_t, flipped_cat_t_2)
+
+    @staticmethod
+    @pytest.mark.parametrize("size", [512])
+    def test_center_crop(size):
+        cat_t, flipped_cat_t, flipped_cat_t_2 = TestTransforms.load_image_and_transform(
+            RandomCrop(size=size, pad_if_needed=True))
+        assert are_equal(flipped_cat_t, flipped_cat_t_2)
+        assert flipped_cat_t.shape[1] == size and flipped_cat_t.shape[2] == size
