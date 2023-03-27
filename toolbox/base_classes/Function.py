@@ -10,6 +10,7 @@ class Function(ABC):
     """
     Abstract class to define a function
     """
+
     def __call__(self, *args, **kwargs):
         return self.f(*args, **kwargs)
 
@@ -35,6 +36,7 @@ class Fidelity(Function, ABC):
     Abstract class to define a fidelity function
     Signature of the function: f(x, y)
     """
+
     @abstractmethod
     def f(self, x: torch.Tensor, y: torch.Tensor):
         raise NotImplementedError()
@@ -52,6 +54,7 @@ class Regularization(Function, ABC):
     Abstract class to define a regularization function
     Signature of the function: f(x)
     """
+
     @abstractmethod
     def f(self, x: torch.Tensor):
         raise NotImplementedError()
@@ -69,6 +72,7 @@ class ProximityOp(Function, ABC):
     Abstract class to define a proximity operator
     Signature of the function: prox(x, tau)
     """
+
     @abstractmethod
     def f(self, x: torch.Tensor, tau: float):
         raise NotImplementedError()
@@ -85,6 +89,7 @@ class GenericFunction(Fidelity, Regularization, ProximityOp):
     """
     Generic class to define a function
     """
+
     def __init__(self, forward_fn, grad_fn, prox_fn):
         super().__init__()
         self.forward_fn = forward_fn
