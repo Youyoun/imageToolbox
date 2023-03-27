@@ -61,7 +61,7 @@ def expand_x_dims(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
 
 
 class GaussianBlurFFT(Operator):
-    PAD_MODE = "constant"
+    PAD_MODE = "replicate"
 
     def __init__(self, ksize: int, s: float = 0.5):
         super().__init__()
@@ -101,7 +101,7 @@ class GaussianBlurFFT(Operator):
 
 
 class BlurConvolution(Operator):
-    PAD_MODE = "constant"
+    PAD_MODE = "replicate"
 
     def __init__(self, ksize: int, type_: Union[Kernels, str], s: Union[float, Tuple[float, float]] = 0.5):
         super().__init__()
