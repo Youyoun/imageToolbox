@@ -51,12 +51,14 @@ class TsengDescent(BasicSolver):
                  max_iter: int = 1000,
                  use_armijo: bool = True,
                  do_compute_metrics: bool = True,
-                 indicator_fn: ProximityOp = Identity()):
+                 indicator_fn: ProximityOp = Identity(),
+                 device: str = "cpu"):
         super().__init__()
         self.fidelity = fidelity
         self.regularization = regularization
         self.operator = TsengOperator(self.fidelity, self.regularization, lambda_)
         self.indicator = indicator_fn
+        self.device = device
 
         self.gamma = gamma
         self.lambda_ = lambda_
@@ -117,6 +119,7 @@ class TsengDescent(BasicSolver):
         if self.use_armijo:
             armijo = GammaSearch(self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False)
 
+        input_vector = input_vector.to(self.device)
         xk_old = input_vector.clone()
         xk = xk_old
         self.metrics = MetricsDictionary()
@@ -130,12 +133,12 @@ class TsengDescent(BasicSolver):
 
             # Compute metrics
             if self.do_compute_metrics:
-                self.metrics.add(self.compute_metrics(xk, xk_old, input_vector, real_x))
-            if compute_relative_difference(xk, xk_old, input_vector) <= _tol:
+                self.metrics.add(self.compute_metrics(xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x))
+            if compute_relative_difference(xk.cpu(), xk_old.cpu(), input_vector.cpu()) <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
             xk_old = xk.clone()
-        return xk, self.metrics
+        return xk.cpu(), self.metrics
 
 
 def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
@@ -149,7 +152,8 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
                            regularization_function: Callable = None,
                            fidelity_function: Callable = None,
                            do_compute_metrics: bool = True,
-                           indicator: ProximityOp = Identity()) -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
+                           indicator: ProximityOp = Identity(),
+                           device: str = "cpu") -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
     """
     Tseng's gradient descent algorithm.
     :param input_vector: Input vector.
@@ -166,12 +170,13 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
     :param fidelity_function: Fidelity function. Must have the signature fidelity_function(x, y)
     :param do_compute_metrics: If True, compute metrics.
     :param indicator: Indicator function (Identity if no constraint on interval).
+    :param device: Device to use.
     :return: Last iterate and metrics dictionary.
     """
     fidelity = GenericFunction(fidelity_function, fidelity_gradient, None)
     regul = GenericFunction(regularization_function, regularization_gradient, None)
 
-    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics, indicator)
+    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics, indicator, device)
     return solver.solve(input_vector, real_x)
 
 
