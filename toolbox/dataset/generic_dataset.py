@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union, List, Tuple, Dict, Callable
 
 from torch.utils import data as data
+import tqdm
 
 from .transforms import get_transforms, AvailableTransforms
 from ..imageOperators import get_clean_image
@@ -36,8 +37,8 @@ class GenericDataset(data.Dataset):
         self.load_in_memory = load_in_memory
         if self.load_in_memory:
             logger.info("Loading images in memory")
-            self.images = [get_clean_image(im_path)[1] for im_path in self.im_path]
-            self.noisy_images = [self.transform_fn(im) for im in self.images]
+            self.images = [get_clean_image(im_path)[1] for im_path in tqdm.tqdm(self.im_path)]
+            self.noisy_images = [self.transform_fn(im) for im in tqdm.tqdm(self.images)]
 
     def __getitem__(self, item):
         if self.load_in_memory:
