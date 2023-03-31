@@ -61,7 +61,7 @@ def expand_x_dims(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Size]:
 
 
 class GaussianBlurFFT(Operator):
-    PAD_MODE = "replicate"
+    PAD_MODE = "constant"
 
     def __init__(self, ksize: int, s: float = 0.5):
         super().__init__()
@@ -117,18 +117,36 @@ class BlurConvolution(Operator):
             DID_LOG_ONCE = True
         # assert self.kernel.sum() == 1.00
 
-    def blurr(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+    def conv_fw(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
         x, init_shape = expand_x_dims(x)
         padding = self.kernel_size // 2
         x_padded = F.pad(x, (padding, padding, padding, padding), self.PAD_MODE)
         x_blurred = F.conv2d(x_padded, kernel.to(x.device), bias=None, padding=0)
         return x_blurred.view(init_shape)
 
+    def conv_bw(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+        x, init_shape = expand_x_dims(x)
+        padding = self.kernel_size // 2
+        x_blurred = F.conv_transpose2d(x, kernel.to(x.device), bias=None, padding=0)
+        if self.PAD_MODE == "replicate":
+            # Manage borders
+            x_blurred[..., padding, padding:-padding] += x_blurred[..., :padding, padding:-padding].sum(dim=-2)
+            x_blurred[..., -padding - 1, padding:-padding] += x_blurred[..., -padding:, padding:-padding].sum(dim=-2)
+            x_blurred[..., padding:-padding, padding] += x_blurred[..., padding:-padding, :padding].sum(dim=-1)
+            x_blurred[..., padding:-padding, -padding - 1] += x_blurred[..., padding:-padding, -padding:].sum(dim=-1)
+
+            # Manage corners
+            x_blurred[..., padding, padding] += x_blurred[..., :padding, :padding].sum(dim=(-2, -1))
+            x_blurred[..., padding, -padding - 1] += x_blurred[..., :padding, -padding:].sum(dim=(-2, -1))
+            x_blurred[..., -padding - 1, padding] += x_blurred[..., -padding:, :padding].sum(dim=(-2, -1))
+            x_blurred[..., -padding - 1, -padding - 1] += x_blurred[..., -padding:, -padding:].sum(dim=(-2, -1))
+        return x_blurred[..., padding:-padding, padding:-padding].view(init_shape)
+
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
-        return self.blurr(x, torch.flip(self.kernel, [0, 1]).view(1, 1, self.kernel_size, self.kernel_size))
+        return self.conv_fw(x, torch.flip(self.kernel, [0, 1]).view(1, 1, self.kernel_size, self.kernel_size))
 
     def rmatvec(self, x: torch.Tensor) -> torch.Tensor:
-        return self.blurr(x, self.kernel.view(1, 1, self.kernel_size, self.kernel_size))
+        return self.conv_bw(x, torch.flip(self.kernel, [0, 1]).view(1, 1, self.kernel_size, self.kernel_size))
 
     def __repr__(self):
         return f"BlurConvolution(kernel_size={self.kernel_size}, type_={self.type}, std={self.std})"
