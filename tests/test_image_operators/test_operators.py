@@ -183,10 +183,10 @@ class TestBlurOperatorsReplicatePadding:
     @staticmethod
     @pytest.mark.parametrize('kernel', Kernels)
     def test_conjugate_property(kernel: Kernels):
-        blurr = BlurConvolution(31, kernel, 3.0)
+        blurr = BlurConvolution(31, kernel, (3.0, 1.0), frequency=1.0)
         blurr.PAD_MODE = "replicate"
-        u1 = torch.randn(2, 1, NDIM_X, NDIM_Y)
-        u2 = torch.randn(2, 1, NDIM_X, NDIM_Y)
+        u1 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
         Au1 = blurr @ u1
         Atu2 = blurr.T @ u2
         z1 = torch.matmul(u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1))
@@ -194,9 +194,10 @@ class TestBlurOperatorsReplicatePadding:
         assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
 
     @staticmethod
-    def test_batch_compute():
+    @pytest.mark.parametrize('kernel', Kernels)
+    def test_batch_compute(kernel: Kernels):
         x = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
-        blurr = BlurConvolution(31, Kernels.GAUSSIAN, 3.0)
+        blurr = BlurConvolution(31, kernel, (3.0, 1.0), frequency=1.0)
         blurr.PAD_MODE = "replicate"
         blurred = blurr @ x
         blurred_t = blurr.T @ x
