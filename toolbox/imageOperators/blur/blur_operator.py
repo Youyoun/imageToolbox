@@ -117,7 +117,7 @@ class BlurConvolution(Operator):
     """
     Blur operator using convolution
     """
-    PAD_MODE = "replicate"
+    PAD_MODE = "constant"
 
     def __init__(self,
                  ksize: int,
@@ -227,14 +227,6 @@ def get_kernel(ksize: int,
     elif type_ == Kernels.GABOR:
         if isinstance(sigma, float):
             sigma = (sigma, sigma)
-        theta = kwargs.get("theta", 0)
-        ct = math.cos(theta)
-        st = math.sin(theta)
-        ksize = math.ceil(max(abs(3 * sigma[0] * ct),
-                              abs(3 * sigma[1] * st),
-                              abs(3 * sigma[1] * ct),
-                              abs(3 * sigma[0] * st),
-                              1))
         filter_ = np.abs(gabor_kernel(sigma_x=sigma[0], sigma_y=sigma[1], **kwargs))
         return torch.from_numpy(filter_).float()
     else:
