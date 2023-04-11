@@ -2,6 +2,7 @@ from typing import Callable, Union, Dict
 
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from .proj_op import Identity
 from ..base_classes import BasicSolver, FunctionNotDefinedError, Fidelity, Regularization, GenericFunction, ProximityOp
@@ -113,7 +114,7 @@ class TsengDescent(BasicSolver):
         logger.info("Running Tseng's gradient descent algorithm...")
         logger.debug(f"Parameters: gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}")
         logger.debug(f"Input vector shape: {input_vector.shape}")
-
+        logger.debug(f"Running on device {self.device}")
         armijo = None
         gamma = self.gamma
         if self.use_armijo:
@@ -123,7 +124,7 @@ class TsengDescent(BasicSolver):
         xk_old = input_vector.clone()
         xk = xk_old
         self.metrics = MetricsDictionary()
-        for step in range(self.max_iter):
+        for step in tqdm(range(self.max_iter)):
             if armijo is not None:
                 gamma = armijo.run_search_get_gamma(xk, y=input_vector)
             # Update (one step)
