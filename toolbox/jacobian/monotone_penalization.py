@@ -105,11 +105,14 @@ class MonotonyRegularization(nn.Module):
         def operator(u):
             return alpha_operator(x_new, y_new, u, self.alpha, self.eval)
 
-        vectors, _ = power_method(x_new, operator, self.max_iters, tol=self.power_iter_tol,
-                                  is_eval=True, return_vector=True)
-        rayleigh_coeff = self.alpha - torch.sum(vectors * operator(vectors), dim=1) / torch.sum(vectors * vectors,
-                                                                                                dim=1)
-        lambda_min = rayleigh_coeff.min()
+        with torch.no_grad():
+            vectors, _ = power_method(x_new, operator, self.max_iters, tol=self.power_iter_tol,
+                                      is_eval=True, return_vector=True)
+        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
+        vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
+        rayleigh_coeff = vtOv / vtv
+
+        lambda_min = (self.alpha - rayleigh_coeff).min()
         return penalization(lambda_min, self.eps, self.use_relu), lambda_min.min().detach()
 
     def _penalization_optpowermethod_noalpha(self,
@@ -130,7 +133,9 @@ class MonotonyRegularization(nn.Module):
         def operator(u):
             return sum_J_JT(x_new, y_new, u, self.eval)
 
-        lambda_max = power_method(x_new, operator, self.max_iters, tol=self.power_iter_tol, is_eval=True).max().item()
+        with torch.no_grad():
+            lambda_max = power_method(x_new, operator, self.max_iters, tol=self.power_iter_tol,
+                                      is_eval=True).max().item()
         logger.debug(f"Lambda max = {lambda_max}")
         if lambda_max < 0:
             logger.warning("The lowest EV is bigger in module than the largest EV. Setting alpha to 0 in power method.")
