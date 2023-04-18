@@ -14,11 +14,15 @@ logger = get_module_logger(__name__)
 DID_LOG_ONCE = False
 
 
-def get_clean_image(image_path: Union[pathlib.Path, str]) -> Tuple[Image.Image, torch.Tensor]:
+def get_clean_image(image_path: Union[pathlib.Path, str], gray_scale=True) -> Tuple[Image.Image, torch.Tensor]:
     orig_image = Image.open(image_path)
-    gray_image = ImageOps.grayscale(orig_image)
-    gray_t = t_transforms.ToTensor()(gray_image)
-    return gray_image, gray_t
+    if gray_scale:
+        gray_image = ImageOps.grayscale(orig_image)
+        gray_t = t_transforms.ToTensor()(gray_image)
+        return gray_image, gray_t
+    else:
+        orig_t = t_transforms.ToTensor()(orig_image)
+        return orig_image, orig_t
 
 
 def get_noisy_image(im_t: torch.Tensor,
