@@ -2,8 +2,8 @@ import glob
 from pathlib import Path
 from typing import Union, List, Tuple, Dict, Callable
 
-from torch.utils import data as data
 import tqdm
+from torch.utils import data as data
 
 from .transforms import get_transforms, AvailableTransforms
 from ..imageOperators import get_clean_image
@@ -19,7 +19,8 @@ class GenericDataset(data.Dataset):
                  clean_transform_fn: Callable,
                  is_train: bool = True,
                  augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
-                 load_in_memory: bool = False):
+                 load_in_memory: bool = False,
+                 colorized: bool = False):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train
@@ -28,6 +29,7 @@ class GenericDataset(data.Dataset):
             self.im_path = self.im_path[: self.n_images]
         self.images = None
         self.noisy_images = None
+        self.colorized = colorized
 
         self.transform_fn = clean_transform_fn
 
@@ -37,14 +39,14 @@ class GenericDataset(data.Dataset):
         self.load_in_memory = load_in_memory
         if self.load_in_memory:
             logger.info("Loading images in memory")
-            self.images = [get_clean_image(im_path)[1] for im_path in tqdm.tqdm(self.im_path)]
+            self.images = [get_clean_image(im_path, not self.colorized)[1] for im_path in tqdm.tqdm(self.im_path)]
             self.noisy_images = [self.transform_fn(im) for im in tqdm.tqdm(self.images)]
 
     def __getitem__(self, item):
         if self.load_in_memory:
             clean_im, noisy_im = self.images[item], self.noisy_images[item]
         else:
-            _, clean_im = get_clean_image(self.im_path[item])
+            _, clean_im = get_clean_image(self.im_path[item], not self.colorized)
             noisy_im = self.transform_fn(clean_im)
         if self.transforms is not None:
             return self.transforms(clean_im, noisy_im)
