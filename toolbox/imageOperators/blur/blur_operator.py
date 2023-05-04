@@ -1,5 +1,4 @@
 import enum
-import math
 from pathlib import Path
 from typing import Union, Tuple
 
@@ -50,6 +49,7 @@ class IdentityOperator(Operator):
     """
     Identity Operator
     """
+
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
@@ -145,7 +145,8 @@ class BlurConvolution(Operator):
         x, init_shape = expand_x_dims(x)
         pad_x, pad_y = self.kernel_size[0] // 2, self.kernel_size[1] // 2
         x_padded = F.pad(x, (pad_y, pad_y, pad_x, pad_x), self.PAD_MODE)
-        x_blurred = F.conv2d(x_padded, kernel.to(x.device), bias=None, padding=0)
+        x_blurred = F.conv2d(x_padded, kernel.to(x.device).repeat(x.shape[1], 1, 1, 1), bias=None, padding=0,
+                             groups=x.shape[1])
         return x_blurred.view(init_shape)
 
     def conv_bw(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
@@ -156,7 +157,8 @@ class BlurConvolution(Operator):
         """
         x, init_shape = expand_x_dims(x)
         pad_x, pad_y = self.kernel_size[0] // 2, self.kernel_size[1] // 2
-        x_blurred = F.conv_transpose2d(x, kernel.to(x.device), bias=None, padding=0)
+        x_blurred = F.conv_transpose2d(x, kernel.to(x.device).repeat(x.shape[1], 1, 1, 1), bias=None, padding=0,
+                                       groups=x.shape[1])
         if self.PAD_MODE == "replicate":
             # Manage borders
             x_blurred[..., pad_x, pad_y:-pad_y] += x_blurred[..., :pad_x, pad_y:-pad_y].sum(dim=-2)
@@ -185,6 +187,7 @@ class ZeroOperator(Operator):
     """
     Zero operator
     """
+
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
         return torch.zeros_like(x)
 
