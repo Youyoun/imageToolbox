@@ -134,7 +134,8 @@ class TsengDescent(BasicSolver):
 
             # Compute metrics
             if self.do_compute_metrics:
-                self.metrics.add(self.compute_metrics(xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x))
+                self.metrics.add({**self.compute_metrics(xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x),
+                                  "gamma": gamma})
             if compute_relative_difference(xk.cpu(), xk_old.cpu(), input_vector.cpu()) <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
