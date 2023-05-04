@@ -6,6 +6,13 @@ from .jacobian import JTJu
 from .power_iteration import power_method
 
 
+def penalization(lambda_max, eps, use_relu=True):
+    if not use_relu:
+        return torch.maximum(lambda_max, torch.ones_like(lambda_max) - eps).max()
+    else:
+        return torch.relu(lambda_max - 1 - eps).max() ** 2
+
+
 def nonexpansive_penalization(net: Callable,
                               x: torch.Tensor,
                               eps: float,
@@ -25,10 +32,14 @@ def nonexpansive_penalization(net: Callable,
     """
     x_new = x.clone()
     x_new.requires_grad_()
-    y_new = net(x_new)
+    y_new = 2 * net(x_new) - x_new  # y = 2T(x) - x
 
     def operator(u):
         return JTJu(x_new, y_new, u, is_eval)
 
-    lambda_max = power_method(x_new, operator, n_iters, tol=power_iter_tol, is_eval=is_eval)
-    return torch.relu(lambda_max - 1 + eps).max() ** 2, lambda_max.max().detach()
+    u = torch.randn_like(x_new)
+    print((operator(u) - 2 * JTJu(x_new, net(x_new), u, is_eval)).abs().max())
+
+    with torch.no_grad():
+        lambda_max = power_method(x_new, operator, n_iters, tol=power_iter_tol, is_eval=is_eval).abs()
+    return penalization(lambda_max, eps, use_relu=False), lambda_max.max().detach()

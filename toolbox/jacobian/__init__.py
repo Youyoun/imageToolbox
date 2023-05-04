@@ -1,4 +1,4 @@
-from .jacobian import Ju, JTu, alpha_operator, sum_J_JT, compute_jacobian, batch_jacobian
+from .jacobian import Ju, JTu, alpha_operator, sum_J_JT, compute_jacobian, batch_jacobian, JTJu
 from .monotone_penalization import PenalizationMethods, MonotonyRegularization,MonotonyRegularizationShift
 from .nonexpansive_penalization import nonexpansive_penalization
 from .power_iteration import power_method
