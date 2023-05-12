@@ -15,8 +15,7 @@ class NormTypes(StrEnum):
 NormLayer = Union[nn.Identity, nn.BatchNorm2d, nn.InstanceNorm2d]
 
 
-def get_norm_layer(num_features: int,
-                   norm_type: Union[str, NormTypes] = 'none') -> NormLayer:
+def get_norm_layer(num_features: int, norm_type: Union[str, NormTypes] = "none") -> NormLayer:
     """Return a normalization layer
     Parameters:
         num_features (int) -- The number of features for the norm layer
@@ -31,4 +30,4 @@ def get_norm_layer(num_features: int,
     elif norm_type == NormTypes.none:
         return nn.Identity()
     else:
-        raise NotImplementedError(f'Normalization layer {norm_type} is not found')
+        raise NotImplementedError(f"Normalization layer {norm_type} is not found")

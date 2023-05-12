@@ -3,12 +3,12 @@
 from enum import auto
 from typing import Union
 
+from ...utils import StrEnum
 from .discriminators import NLayerDiscriminator, PixelDiscriminator
 from .init_model import init_net
 from .norm_layers import NormTypes
 from .resnet_generator import ResnetGenerator
 from .unet_generator import UnetGenerator
-from ...utils import StrEnum
 
 
 class GeneratorModels(StrEnum):
@@ -24,15 +24,17 @@ class DiscriminatorModels(StrEnum):
     Pixel = auto()
 
 
-def get_generator(input_nc: int,
-                  output_nc: int,
-                  ngf: int,
-                  netG: Union[str, GeneratorModels],
-                  norm: Union[str, NormTypes] = NormTypes.none,
-                  use_dropout: bool = False,
-                  init_type: str = 'normal',
-                  init_gain: float = 0.02,
-                  gpu_ids: list = []):
+def get_generator(
+    input_nc: int,
+    output_nc: int,
+    ngf: int,
+    netG: Union[str, GeneratorModels],
+    norm: Union[str, NormTypes] = NormTypes.none,
+    use_dropout: bool = False,
+    init_type: str = "normal",
+    init_gain: float = 0.02,
+    gpu_ids: list = [],
+):
     """Create a generator
     Parameters:
         input_nc (int) -- the number of channels in input images
@@ -54,26 +56,32 @@ def get_generator(input_nc: int,
     The generator has been initialized by <init_net>. It uses RELU for non-linearity.
     """
     if netG == GeneratorModels.Resnet_9blocks:
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm, use_dropout=use_dropout, n_blocks=9)
+        net = ResnetGenerator(
+            input_nc, output_nc, ngf, norm_layer=norm, use_dropout=use_dropout, n_blocks=9
+        )
     elif netG == GeneratorModels.Resnet_6blocks:
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm, use_dropout=use_dropout, n_blocks=6)
+        net = ResnetGenerator(
+            input_nc, output_nc, ngf, norm_layer=norm, use_dropout=use_dropout, n_blocks=6
+        )
     elif netG == GeneratorModels.Unet_128:
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm, use_dropout=use_dropout)
     elif netG == GeneratorModels.Unet_256:
         net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm, use_dropout=use_dropout)
     else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
+        raise NotImplementedError("Generator model name [%s] is not recognized" % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def get_discriminator(input_nc: int,
-                      ndf: int,
-                      netD: Union[str, DiscriminatorModels],
-                      n_layers_D: int = 3,
-                      norm: Union[str, NormTypes] = NormTypes.none,
-                      init_type: str = 'normal',
-                      init_gain: float = 0.02,
-                      gpu_ids: list = []) -> Union[NLayerDiscriminator, PixelDiscriminator]:
+def get_discriminator(
+    input_nc: int,
+    ndf: int,
+    netD: Union[str, DiscriminatorModels],
+    n_layers_D: int = 3,
+    norm: Union[str, NormTypes] = NormTypes.none,
+    init_type: str = "normal",
+    init_gain: float = 0.02,
+    gpu_ids: list = [],
+) -> Union[NLayerDiscriminator, PixelDiscriminator]:
     """Create a discriminator
     Parameters:
         input_nc (int)     -- the number of channels in input images
@@ -104,5 +112,5 @@ def get_discriminator(input_nc: int,
     elif netD == DiscriminatorModels.Pixel:  # classify if each pixel is real or fake
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm)
     else:
-        raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
+        raise NotImplementedError("Discriminator model name [%s] is not recognized" % netD)
     return init_net(net, init_type, init_gain, gpu_ids)
