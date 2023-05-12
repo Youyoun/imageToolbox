@@ -1,13 +1,25 @@
-from typing import Callable, Union, Dict
+from typing import Callable, Dict, Tuple, Union
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from .proj_op import Identity
-from ..base_classes import BasicSolver, FunctionNotDefinedError, Fidelity, Regularization, GenericFunction, ProximityOp
-from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
+from ..base_classes import (
+    BasicSolver,
+    Fidelity,
+    FunctionNotDefinedError,
+    GenericFunction,
+    ProximityOp,
+    Regularization,
+)
+from ..metrics import (
+    SNR,
+    MetricsDictionary,
+    compute_relative_difference,
+    mean_absolute_error,
+)
 from ..utils import get_module_logger
+from .proj_op import Identity
 
 logger = get_module_logger(__name__)
 
@@ -44,16 +56,18 @@ class TsengDescent(BasicSolver):
     Tseng's gradient descent algorithm.
     """
 
-    def __init__(self,
-                 fidelity: Fidelity,
-                 regularization: Regularization,
-                 gamma: float,
-                 lambda_: float = 1.0,
-                 max_iter: int = 1000,
-                 use_armijo: bool = True,
-                 do_compute_metrics: bool = True,
-                 indicator_fn: ProximityOp = Identity(),
-                 device: str = "cpu"):
+    def __init__(
+        self,
+        fidelity: Fidelity,
+        regularization: Regularization,
+        gamma: float,
+        lambda_: float = 1.0,
+        max_iter: int = 1000,
+        use_armijo: bool = True,
+        do_compute_metrics: bool = True,
+        indicator_fn: ProximityOp = Identity(),
+        device: str = "cpu",
+    ):
         super().__init__()
         self.fidelity = fidelity
         self.regularization = regularization
@@ -71,11 +85,13 @@ class TsengDescent(BasicSolver):
         if self.do_compute_metrics:
             self.metrics = MetricsDictionary()
 
-    def compute_metrics(self,
-                        xk: torch.Tensor,
-                        xk_old: torch.Tensor,
-                        input_vector: torch.Tensor,
-                        real_x: torch.Tensor) -> Dict[str, float]:
+    def compute_metrics(
+        self,
+        xk: torch.Tensor,
+        xk_old: torch.Tensor,
+        input_vector: torch.Tensor,
+        real_x: torch.Tensor,
+    ) -> Dict[str, float]:
         """
         Compute metrics.
         :param xk: Current iterate.
@@ -93,17 +109,23 @@ class TsengDescent(BasicSolver):
             f_x = 0.0
 
         return {
-            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector).item(),
-            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x).item() if real_x is not None else 0.0,
+            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(
+                xk, xk_old, input_vector
+            ).item(),
+            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x).item()
+            if real_x is not None
+            else 0.0,
             "R(x_{k+1})": r_x,
             "F(x_{k+1})": f_x,
             "F(x_{k+1}) + \\lambda R(x_{k+1})": f_x + self.lambda_ * r_x,
             "SNR": SNR(xk).item(),
         }
 
-    def solve(self,
-              input_vector: torch.Tensor,
-              real_x: torch.Tensor = None, ) -> (torch.Tensor, MetricsDictionary):
+    def solve(
+        self,
+        input_vector: torch.Tensor,
+        real_x: torch.Tensor = None,
+    ) -> Tuple[torch.Tensor, MetricsDictionary]:
         """
         Tseng's gradient descent algorithm.
         :param input_vector: Input vector.
@@ -112,13 +134,17 @@ class TsengDescent(BasicSolver):
         """
         _tol = 1e-8
         logger.info("Running Tseng's gradient descent algorithm...")
-        logger.debug(f"Parameters: gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}")
+        logger.debug(
+            f"Parameters: gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}"
+        )
         logger.debug(f"Input vector shape: {input_vector.shape}")
         logger.debug(f"Running on device {self.device}")
         armijo = None
         gamma = self.gamma
         if self.use_armijo:
-            armijo = GammaSearch(self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False)
+            armijo = GammaSearch(
+                self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False
+            )
 
         y = input_vector.clone().to(self.device)
         xk_old = y.clone()
@@ -134,8 +160,12 @@ class TsengDescent(BasicSolver):
 
             # Compute metrics
             if self.do_compute_metrics:
-                self.metrics.add({**self.compute_metrics(xk.cpu(), xk_old.cpu(), y.cpu(), real_x),
-                                  "gamma": gamma})
+                self.metrics.add(
+                    {
+                        **self.compute_metrics(xk.cpu(), xk_old.cpu(), y.cpu(), real_x),
+                        "gamma": gamma,
+                    }
+                )
             if compute_relative_difference(xk.cpu(), xk_old.cpu(), y.cpu()) <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
@@ -143,19 +173,21 @@ class TsengDescent(BasicSolver):
         return xk.cpu(), self.metrics
 
 
-def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
-                           fidelity_gradient: Callable,
-                           regularization_gradient: Callable,
-                           gamma: float,
-                           lambda_: float,
-                           use_armijo: bool = False,
-                           max_iter: int = 1000,
-                           real_x: np.ndarray = None,
-                           regularization_function: Callable = None,
-                           fidelity_function: Callable = None,
-                           do_compute_metrics: bool = True,
-                           indicator: ProximityOp = Identity(),
-                           device: str = "cpu") -> (Union[np.ndarray, torch.Tensor], MetricsDictionary):
+def tseng_gradient_descent(
+    input_vector: Union[np.ndarray, torch.Tensor],
+    fidelity_gradient: Callable,
+    regularization_gradient: Callable,
+    gamma: float,
+    lambda_: float,
+    use_armijo: bool = False,
+    max_iter: int = 1000,
+    real_x: np.ndarray = None,
+    regularization_function: Callable = None,
+    fidelity_function: Callable = None,
+    do_compute_metrics: bool = True,
+    indicator: ProximityOp = Identity(),
+    device: str = "cpu",
+) -> Tuple[Union[np.ndarray, torch.Tensor], MetricsDictionary]:
     """
     Tseng's gradient descent algorithm.
     :param input_vector: Input vector.
@@ -178,19 +210,31 @@ def tseng_gradient_descent(input_vector: Union[np.ndarray, torch.Tensor],
     fidelity = GenericFunction(fidelity_function, fidelity_gradient, None)
     regul = GenericFunction(regularization_function, regularization_gradient, None)
 
-    solver = TsengDescent(fidelity, regul, gamma, lambda_, max_iter, use_armijo, do_compute_metrics, indicator, device)
+    solver = TsengDescent(
+        fidelity,
+        regul,
+        gamma,
+        lambda_,
+        max_iter,
+        use_armijo,
+        do_compute_metrics,
+        indicator,
+        device,
+    )
     return solver.solve(input_vector, real_x)
 
 
 class GammaSearch:
-    def __init__(self,
-                 operator: TsengOperator,
-                 theta: float = 0.9,
-                 beta: float = 0.8,
-                 sigma: float = 1,
-                 gamma_min: float = 1e-4,
-                 reset_each_search: bool = False,
-                 projection: ProximityOp = None):
+    def __init__(
+        self,
+        operator: TsengOperator,
+        theta: float = 0.9,
+        beta: float = 0.8,
+        sigma: float = 1,
+        gamma_min: float = 1e-4,
+        reset_each_search: bool = False,
+        projection: ProximityOp = None,
+    ):
         """
         Gamma search for the Tseng's gradient descent algorithm. The search is based on the Armijo rule. The search is
         performed by decreasing the step size until the Armijo rule is satisfied. The step size is decreased by a factor
@@ -216,7 +260,9 @@ class GammaSearch:
         if self.projection is None:
             self.projection = Identity()
         self.reset_each_search = reset_each_search
-        logger.debug(f"Armijo is {'not' if not self.reset_each_search else ''} reset after each iteration.")
+        logger.debug(
+            f"Armijo is {'not' if not self.reset_each_search else ''} reset after each iteration."
+        )
 
     @property
     def gamma(self):
@@ -224,7 +270,7 @@ class GammaSearch:
         Compute the step size. The step size is computed as sigma * beta ** power.
         :return: Step size.
         """
-        return self.sigma * self.beta ** self.power
+        return self.sigma * self.beta**self.power
 
     def reset_power(self):
         """
@@ -254,7 +300,9 @@ class GammaSearch:
             Zc = self.projection.prox(x - self.gamma * nabla_f)
 
             # \gamma ||A(Z_C(x_k, y)) - A(x_k)||
-            diff_op = self.gamma * torch.linalg.norm((self.operator.grad(Zc, y) - nabla_f).flatten(), ord=2)
+            diff_op = self.gamma * torch.linalg.norm(
+                (self.operator.grad(Zc, y) - nabla_f).flatten(), ord=2
+            )
 
             # \theta || Z_C(x_k, \gamma) - x_k||
             diff_x = self.theta * torch.linalg.norm((Zc - x).flatten(), ord=2)
@@ -264,7 +312,9 @@ class GammaSearch:
             else:
                 self.power += 1
                 if self.gamma < self.gamma_min:
-                    logger.warning(f"Gamma search stopped at gamma={self.gamma} < gamma_min={self.gamma_min}.")
+                    logger.warning(
+                        f"Gamma search stopped at gamma={self.gamma} < gamma_min={self.gamma_min}."
+                    )
                     break
 
     def run_search_get_gamma(self, x, y):

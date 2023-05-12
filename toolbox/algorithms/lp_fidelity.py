@@ -1,7 +1,7 @@
 import torch
 
-from ..imageOperators import BlurConvolution
 from ..base_classes import Fidelity
+from ..imageOperators import BlurConvolution
 
 
 class LpFidelity(Fidelity):

@@ -33,4 +33,6 @@ class Indicator(ProximityOp):
         return torch.inf
 
     def prox(self, x: torch.Tensor, tau: float = None) -> torch.Tensor:
-        return torch.max(torch.tensor(self.lower_bound), torch.min(x, torch.tensor(self.upper_bound)))
+        return torch.max(
+            torch.tensor(self.lower_bound), torch.min(x, torch.tensor(self.upper_bound))
+        )

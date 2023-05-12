@@ -1,10 +1,21 @@
-from typing import Callable, Dict
+from typing import Callable, Dict, Tuple
 
 import torch
 import tqdm
 
-from ..base_classes import BasicSolver, FunctionNotDefinedError, GenericFunction, Fidelity, ProximityOp
-from ..metrics import MetricsDictionary, mean_absolute_error, compute_relative_difference, SNR
+from ..base_classes import (
+    BasicSolver,
+    Fidelity,
+    FunctionNotDefinedError,
+    GenericFunction,
+    ProximityOp,
+)
+from ..metrics import (
+    SNR,
+    MetricsDictionary,
+    compute_relative_difference,
+    mean_absolute_error,
+)
 
 
 class ProximalDescent(BasicSolver):
@@ -18,14 +29,16 @@ class ProximalDescent(BasicSolver):
     :param do_compute_metrics: If True, compute metrics
     """
 
-    def __init__(self,
-                 fidelity: Fidelity,
-                 prox: ProximityOp,
-                 gamma: float,
-                 lambda_: float,
-                 max_iter: int = 1000,
-                 do_compute_metrics: bool = True,
-                 device="cpu"):
+    def __init__(
+        self,
+        fidelity: Fidelity,
+        prox: ProximityOp,
+        gamma: float,
+        lambda_: float,
+        max_iter: int = 1000,
+        do_compute_metrics: bool = True,
+        device="cpu",
+    ):
         super().__init__()
         self.fidelity = fidelity
         self.prox = prox
@@ -39,11 +52,13 @@ class ProximalDescent(BasicSolver):
         if self.do_compute_metrics:
             self.metrics = MetricsDictionary()
 
-    def compute_metrics(self,
-                        xk: torch.Tensor,
-                        xk_old: torch.Tensor,
-                        input_vector: torch.Tensor,
-                        real_x: torch.Tensor) -> Dict[str, float]:
+    def compute_metrics(
+        self,
+        xk: torch.Tensor,
+        xk_old: torch.Tensor,
+        input_vector: torch.Tensor,
+        real_x: torch.Tensor,
+    ) -> Dict[str, float]:
         """
         Compute metrics.
         :param xk: Current iterate.
@@ -61,15 +76,21 @@ class ProximalDescent(BasicSolver):
             f_x = 0.0
 
         return {
-            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
-            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
+            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(
+                xk, xk_old, input_vector
+            ),
+            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x)
+            if real_x is not None
+            else 0,
             "R(x_{k+1})": r_x,
             "F(x_{k+1})": f_x,
             "F(x_{k+1}) + \\lambda R(x_{k+1})": f_x + self.lambda_ * r_x,
             "SNR": SNR(xk),
         }
 
-    def solve(self, input_vector: torch.Tensor, real_x: torch.Tensor = None) -> (torch.Tensor, MetricsDictionary):
+    def solve(
+        self, input_vector: torch.Tensor, real_x: torch.Tensor = None
+    ) -> Tuple[torch.Tensor, MetricsDictionary]:
         """
         Solve the optimization problem.
         :param input_vector: Input vector.
@@ -85,26 +106,37 @@ class ProximalDescent(BasicSolver):
             self.metrics = MetricsDictionary()
         for step in tqdm.tqdm(range(self.max_iter)):
             # Prox_{\gamma R} (x_k - \gamma \nabla F(x_k))
-            xk = self.prox.prox(xk - self.gamma * self.fidelity.grad(xk, y=input_vector),
-                                self.gamma * self.lambda_)
+            xk = self.prox.prox(
+                xk - self.gamma * self.fidelity.grad(xk, y=input_vector),
+                self.gamma * self.lambda_,
+            )
             if self.do_compute_metrics:
-                self.metrics.add(self.compute_metrics(xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x.cpu()))
-            if compute_relative_difference(xk.cpu(), xk_old.cpu(), input_vector.cpu()) <= _tol:
+                self.metrics.add(
+                    self.compute_metrics(
+                        xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x.cpu()
+                    )
+                )
+            if (
+                compute_relative_difference(xk.cpu(), xk_old.cpu(), input_vector.cpu())
+                <= _tol
+            ):
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
             xk_old = xk.clone()
         return xk.cpu(), self.metrics
 
 
-def prox_descent(input_vector: torch.Tensor,
-                 fidelity_grad: Callable,
-                 regul_prox: Callable,
-                 gamma: float,
-                 lambda_: float = 1.0,
-                 max_iter: int = 1000,
-                 real_x: torch.Tensor = None,
-                 regul_function: Callable = None,
-                 fidelity_function: Callable = None) -> (torch.Tensor, MetricsDictionary):
+def prox_descent(
+    input_vector: torch.Tensor,
+    fidelity_grad: Callable,
+    regul_prox: Callable,
+    gamma: float,
+    lambda_: float = 1.0,
+    max_iter: int = 1000,
+    real_x: torch.Tensor = None,
+    regul_function: Callable = None,
+    fidelity_function: Callable = None,
+) -> Tuple[torch.Tensor, MetricsDictionary]:
     """
     Wrapper for the ProximalDescent class.
     :param input_vector: Input vector.
