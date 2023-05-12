@@ -37,18 +37,18 @@ class PoissonNoise(NoiseClass):
 
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         # Detect if a signed image was input
-        low_clip = 0.
+        low_clip = 0.0
         if x.min() < 0:
-            low_clip = -1.
+            low_clip = -1.0
 
-        if low_clip == -1.:
+        if low_clip == -1.0:
             old_max = x.max()
-            x = (x + 1.) / (old_max + 1.)
+            x = (x + 1.0) / (old_max + 1.0)
 
         noisy = np.random.poisson(x.numpy() * self.scale) / self.scale
 
-        if low_clip == -1.:
-            noisy = noisy * (float(old_max) + 1.) - 1.
+        if low_clip == -1.0:
+            noisy = noisy * (float(old_max) + 1.0) - 1.0
         return torch.from_numpy(noisy).float().clip(low_clip, 1)
 
 
@@ -59,10 +59,12 @@ def _convert_noise_str_to_enum(noise_mode: str) -> NoiseModes:
     raise ValueError(f"{noise_mode} is not implemented here.")
 
 
-def get_noise_func(noise_mode: Union[NoiseModes, str],
-                   mean_gauss: float = 0.0,
-                   std_gauss: float = 1.0,
-                   scale_poisson: float = 1.0) -> NoiseClass:
+def get_noise_func(
+    noise_mode: Union[NoiseModes, str],
+    mean_gauss: float = 0.0,
+    std_gauss: float = 1.0,
+    scale_poisson: float = 1.0,
+) -> NoiseClass:
     if noise_mode == NoiseModes.POISSON:
         return PoissonNoise(scale_poisson)
     elif noise_mode == NoiseModes.GAUSSIAN:

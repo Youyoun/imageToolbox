@@ -5,12 +5,14 @@ from torch.utils import data as data
 
 
 class NoiseDataset(data.Dataset):
-    def __init__(self,
-                 images: list,
-                 noise: callable,
-                 blur: callable,
-                 transforms: callable = None,
-                 percent_data: float = 0.1):
+    def __init__(
+        self,
+        images: list,
+        noise: callable,
+        blur: callable,
+        transforms: callable = None,
+        percent_data: float = 0.1,
+    ):
         super().__init__()
         self.images = images
         self.noise_fn = noise

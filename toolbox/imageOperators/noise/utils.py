@@ -5,16 +5,18 @@ import torch
 from PIL import Image, ImageOps
 from torchvision import transforms as t_transforms
 
-from .noise import NoiseModes, get_noise_func
-from ..blur import BlurConvolution, Kernels, IdentityOperator
 from ...utils import get_module_logger
+from ..blur import BlurConvolution, IdentityOperator, Kernels
+from .noise import NoiseModes, get_noise_func
 
 logger = get_module_logger(__name__)
 
 DID_LOG_ONCE = False
 
 
-def get_clean_image(image_path: Union[pathlib.Path, str], gray_scale=True) -> Tuple[Image.Image, torch.Tensor]:
+def get_clean_image(
+    image_path: Union[pathlib.Path, str], gray_scale=True
+) -> Tuple[Image.Image, torch.Tensor]:
     orig_image = Image.open(image_path)
     if gray_scale:
         gray_image = ImageOps.grayscale(orig_image)
@@ -25,20 +27,23 @@ def get_clean_image(image_path: Union[pathlib.Path, str], gray_scale=True) -> Tu
         return orig_image, orig_t
 
 
-def get_noisy_image(im_t: torch.Tensor,
-                    blur_type: Union[Kernels, str],
-                    kernel_size: int,
-                    kernel_std: float,
-                    noise_mode: Union[NoiseModes, str],
-                    mean: float = 0.0,
-                    std: float = 1.0,
-                    scale: float = 100.0) -> Tuple[Image.Image, torch.Tensor, BlurConvolution]:
+def get_noisy_image(
+    im_t: torch.Tensor,
+    blur_type: Union[Kernels, str],
+    kernel_size: int,
+    kernel_std: float,
+    noise_mode: Union[NoiseModes, str],
+    mean: float = 0.0,
+    std: float = 1.0,
+    scale: float = 100.0,
+) -> Tuple[Image.Image, torch.Tensor, BlurConvolution]:
     assert im_t.max() == 1 and im_t.min() == 0, "Image bounds are  < 0 or > 1"
     global DID_LOG_ONCE
     if not DID_LOG_ONCE:
         logger.info(f"Using Kernel: {blur_type} Noise type: {noise_mode}")
         logger.debug(
-            f"Noise parameters: {f'μ={mean} σ={std}' if noise_mode == NoiseModes.GAUSSIAN else f'λ={scale}'}")
+            f"Noise parameters: {f'μ={mean} σ={std}' if noise_mode == NoiseModes.GAUSSIAN else f'λ={scale}'}"
+        )
         DID_LOG_ONCE = True
     if blur_type is None:
         blur_op = IdentityOperator()

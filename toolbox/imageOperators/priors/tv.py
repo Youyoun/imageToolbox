@@ -1,8 +1,8 @@
 import torch
 
-from ..im_gradient import Gradient, Directions
 from ...base_classes import Regularization
 from ...utils import get_module_logger
+from ..im_gradient import Directions, Gradient
 
 logger = get_module_logger(__name__)
 
@@ -14,7 +14,10 @@ class SmoothTotalVariation(Regularization):
 
     def f(self, x: torch.Tensor) -> torch.Tensor:
         return torch.sum(
-            torch.sqrt(Gradient(x, Directions.X) ** 2 + Gradient(x, Directions.Y) ** 2 + self.epsilon_tv))
+            torch.sqrt(
+                Gradient(x, Directions.X) ** 2 + Gradient(x, Directions.Y) ** 2 + self.epsilon_tv
+            )
+        )
 
     def grad(self, x: torch.Tensor) -> torch.Tensor:
         grad_x = Gradient(x, Directions.X)

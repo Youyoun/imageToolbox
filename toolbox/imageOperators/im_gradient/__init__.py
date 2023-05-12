@@ -1,1 +1,1 @@
-from .image_gradient import Gradient, Directions
+from .image_gradient import Directions, Gradient

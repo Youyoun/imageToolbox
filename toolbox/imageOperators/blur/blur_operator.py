@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import torch
@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter
 from skimage.filters._gabor import gabor_kernel
 
 from ...base_classes import Operator
-from ...utils import get_module_logger, StrEnum
+from ...utils import StrEnum, get_module_logger
 
 logger = get_module_logger(__name__)
 
@@ -41,7 +41,7 @@ kernel_type_img_map = {
     Kernels.TYPE_E: CURRENT_FILE_PATH / "kernels/kernel5.png",
     Kernels.TYPE_F: CURRENT_FILE_PATH / "kernels/kernel6.png",
     Kernels.TYPE_G: CURRENT_FILE_PATH / "kernels/kernel7.png",
-    Kernels.TYPE_H: CURRENT_FILE_PATH / "kernels/kernel8.png"
+    Kernels.TYPE_H: CURRENT_FILE_PATH / "kernels/kernel8.png",
 }
 
 
@@ -74,6 +74,7 @@ class GaussianBlurFFT(Operator):
     Gaussian Blur using FFT
     Only constant padding is supported
     """
+
     PAD_MODE = "constant"
 
     def __init__(self, ksize: int, s: float = 0.5):
@@ -88,7 +89,9 @@ class GaussianBlurFFT(Operator):
         padding = self.kernel_size // 2
         x_pad = torch.nn.functional.pad(x, (padding, padding, padding, padding), self.PAD_MODE)
         fft_x = torch.fft.fft2(x_pad)
-        fft_h = torch.fft.fft2(self.kernel.to(x.device), s=x_pad.shape[2:]).unsqueeze(0).unsqueeze(0)
+        fft_h = (
+            torch.fft.fft2(self.kernel.to(x.device), s=x_pad.shape[2:]).unsqueeze(0).unsqueeze(0)
+        )
         if conj:
             print("Computing conjugate")
             x_new = torch.real(torch.fft.ifft2(fft_x * torch.conj(fft_h)))
@@ -101,9 +104,9 @@ class GaussianBlurFFT(Operator):
         padding = self.kernel_size // 2
         x_new = self.fft_convolve(x, conj)
         if conj:
-            x_new = x_new[:, :, :-2 * padding, :-2 * padding]
+            x_new = x_new[:, :, : -2 * padding, : -2 * padding]
         else:
-            x_new = x_new[:, :, 2 * padding:, 2 * padding:]
+            x_new = x_new[:, :, 2 * padding :, 2 * padding :]
         return x_new.view(*init_shape)
 
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
@@ -117,13 +120,16 @@ class BlurConvolution(Operator):
     """
     Blur operator using convolution
     """
+
     PAD_MODE = "constant"
 
-    def __init__(self,
-                 ksize: int,
-                 type_: Union[Kernels, str],
-                 s: Union[float, Tuple[float, float]] = 0.5,
-                 **kwargs):
+    def __init__(
+        self,
+        ksize: int,
+        type_: Union[Kernels, str],
+        s: Union[float, Tuple[float, float]] = 0.5,
+        **kwargs,
+    ):
         super().__init__()
         global DID_LOG_ONCE
         # Define Gaussian Kernel
@@ -145,8 +151,13 @@ class BlurConvolution(Operator):
         x, init_shape = expand_x_dims(x)
         pad_x, pad_y = self.kernel_size[0] // 2, self.kernel_size[1] // 2
         x_padded = F.pad(x, (pad_y, pad_y, pad_x, pad_x), self.PAD_MODE)
-        x_blurred = F.conv2d(x_padded, kernel.to(x.device).repeat(x.shape[1], 1, 1, 1), bias=None, padding=0,
-                             groups=x.shape[1])
+        x_blurred = F.conv2d(
+            x_padded,
+            kernel.to(x.device).repeat(x.shape[1], 1, 1, 1),
+            bias=None,
+            padding=0,
+            groups=x.shape[1],
+        )
         return x_blurred.view(init_shape)
 
     def conv_bw(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
@@ -157,20 +168,31 @@ class BlurConvolution(Operator):
         """
         x, init_shape = expand_x_dims(x)
         pad_x, pad_y = self.kernel_size[0] // 2, self.kernel_size[1] // 2
-        x_blurred = F.conv_transpose2d(x, kernel.to(x.device).repeat(x.shape[1], 1, 1, 1), bias=None, padding=0,
-                                       groups=x.shape[1])
+        x_blurred = F.conv_transpose2d(
+            x,
+            kernel.to(x.device).repeat(x.shape[1], 1, 1, 1),
+            bias=None,
+            padding=0,
+            groups=x.shape[1],
+        )
         if self.PAD_MODE == "replicate":
             # Manage borders
             x_blurred[..., pad_x, pad_y:-pad_y] += x_blurred[..., :pad_x, pad_y:-pad_y].sum(dim=-2)
-            x_blurred[..., -pad_x - 1, pad_y:-pad_y] += x_blurred[..., -pad_x:, pad_y:-pad_y].sum(dim=-2)
+            x_blurred[..., -pad_x - 1, pad_y:-pad_y] += x_blurred[..., -pad_x:, pad_y:-pad_y].sum(
+                dim=-2
+            )
             x_blurred[..., pad_x:-pad_x, pad_y] += x_blurred[..., pad_x:-pad_x, :pad_y].sum(dim=-1)
-            x_blurred[..., pad_x:-pad_x, -pad_y - 1] += x_blurred[..., pad_x:-pad_x, -pad_y:].sum(dim=-1)
+            x_blurred[..., pad_x:-pad_x, -pad_y - 1] += x_blurred[..., pad_x:-pad_x, -pad_y:].sum(
+                dim=-1
+            )
 
             # Manage corners
             x_blurred[..., pad_x, pad_y] += x_blurred[..., :pad_x, :pad_y].sum(dim=(-2, -1))
             x_blurred[..., pad_x, -pad_y - 1] += x_blurred[..., :pad_x, -pad_y:].sum(dim=(-2, -1))
             x_blurred[..., -pad_x - 1, pad_y] += x_blurred[..., -pad_x:, :pad_y].sum(dim=(-2, -1))
-            x_blurred[..., -pad_x - 1, -pad_y - 1] += x_blurred[..., -pad_x:, -pad_y:].sum(dim=(-2, -1))
+            x_blurred[..., -pad_x - 1, -pad_y - 1] += x_blurred[..., -pad_x:, -pad_y:].sum(
+                dim=(-2, -1)
+            )
         return x_blurred[..., pad_x:-pad_x, pad_y:-pad_y].view(init_shape)
 
     def matvec(self, x: torch.Tensor) -> torch.Tensor:
@@ -180,7 +202,9 @@ class BlurConvolution(Operator):
         return self.conv_bw(x, torch.flip(self.kernel, [0, 1]).view(1, 1, *self.kernel_size))
 
     def __repr__(self):
-        return f"BlurConvolution(kernel_size={self.kernel_size}, type_={self.type}, std={self.std})"
+        return (
+            f"BlurConvolution(kernel_size={self.kernel_size}, type_={self.type}, std={self.std})"
+        )
 
 
 class ZeroOperator(Operator):
@@ -205,10 +229,9 @@ def _convert_str_type_to_kernel(str_: str) -> Kernels:
     raise ValueError(f"Kernel provided is not available: {str_}")
 
 
-def get_kernel(ksize: int,
-               type_: Union[Kernels, str],
-               sigma: Union[float, Tuple[float, float]],
-               **kwargs) -> torch.Tensor:
+def get_kernel(
+    ksize: int, type_: Union[Kernels, str], sigma: Union[float, Tuple[float, float]], **kwargs
+) -> torch.Tensor:
     """
     Get a kernel of a given type and size.
     :param ksize: kernel size
@@ -226,7 +249,7 @@ def get_kernel(ksize: int,
             sigma = (sigma, sigma)
         return torch.from_numpy(gaussian_filter(kernel, sigma)).float()  # already normalized
     elif type_ == Kernels.UNIFORM:
-        return torch.ones((ksize, ksize)) / ksize ** 2
+        return torch.ones((ksize, ksize)) / ksize**2
     elif type_ == Kernels.GABOR:
         if isinstance(sigma, float):
             sigma = (sigma, sigma)
