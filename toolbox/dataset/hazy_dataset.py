@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Union, List, Tuple, Dict
+from typing import Dict, List, Tuple, Union
 
 from torch.utils import data as data
 
-from .transforms import AvailableTransforms, get_transforms
 from ..imageOperators import get_clean_image
 from ..utils import get_module_logger
+from .transforms import AvailableTransforms, get_transforms
 
 logger = get_module_logger(__name__)
 
@@ -19,10 +19,12 @@ def get_all_imgs_in_dir(dir_: Union[str, Path]):
 
 
 class DHazeDataset(data.Dataset):
-    def __init__(self,
-                 root: Union[str, Path],
-                 n_images: int,
-                 transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
+    def __init__(
+        self,
+        root: Union[str, Path],
+        n_images: int,
+        transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
+    ):
         self.data_path = Path(root)
         self.n_images = n_images
         gt_dir = list(self.data_path.glob("*_GT"))[0]

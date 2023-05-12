@@ -1,6 +1,6 @@
 import random
 from enum import auto
-from typing import List, Tuple, Dict, Any, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 from torchvision import transforms as T
@@ -16,7 +16,9 @@ Thanks PyTorch
 
 
 class Transform:
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError()
 
 
@@ -24,7 +26,9 @@ class Compose(Transform):
     def __init__(self, transforms: List[Transform]):
         self.transforms = transforms
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         for t in self.transforms:
             image, target = t(image, target)
         return image, target
@@ -42,7 +46,9 @@ class RandomHorizontalFlip(Transform):
     def __init__(self, p: float):
         self.flip_prob = p
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.flip_prob:
             image = F.hflip(image)
             target = F.hflip(target)
@@ -56,7 +62,9 @@ class RandomVerticalFlip(Transform):
     def __init__(self, p: float):
         self.flip_prob = p
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.flip_prob:
             image = F.vflip(image)
             target = F.vflip(target)
@@ -70,7 +78,9 @@ class Random90Rotation(Transform):
     def __init__(self, p: float = 0.5):
         self.p = p
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.p:
             image = F.rotate(image, 90)
             target = F.rotate(target, 90)
@@ -87,8 +97,9 @@ class RandomCrop(Transform):
         self.fill = fill
         self.padding_mode = padding_mode
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         _, height, width = image.shape
         if self.pad_if_needed and height < self.size:
             padding = [0, self.size - height]
@@ -113,7 +124,9 @@ class CenterCrop(Transform):
         self.size = size
         self.crop_fn = T.CenterCrop(self.size)
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         image = self.crop_fn(image)
         target = self.crop_fn(target)
         return image, target
@@ -128,7 +141,9 @@ class Normalize(Transform):
         self.std = std
         self.normalize = T.Normalize(mean, std)
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         image = self.normalize(image)
         target = self.normalize(target)
         return image, target
@@ -150,13 +165,21 @@ class RandomScaling(Transform):
         self.p = p
         self.scales = scales
 
-    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __call__(
+        self, image: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         if random.random() < self.p:
             scale = random.choice(self.scales)
-            image = F.resize(image, (int(image.shape[-2] * scale), int(image.shape[-1] * scale)),
-                             interpolation=T.InterpolationMode.NEAREST)
-            target = F.resize(target, (int(target.shape[-2] * scale), int(target.shape[-1] * scale)),
-                              interpolation=T.InterpolationMode.NEAREST)
+            image = F.resize(
+                image,
+                (int(image.shape[-2] * scale), int(image.shape[-1] * scale)),
+                interpolation=T.InterpolationMode.NEAREST,
+            )
+            target = F.resize(
+                target,
+                (int(target.shape[-2] * scale), int(target.shape[-1] * scale)),
+                interpolation=T.InterpolationMode.NEAREST,
+            )
         return image, target
 
     def __repr__(self) -> str:
@@ -181,7 +204,7 @@ class TransformsFactory:
         AvailableTransforms.RandomScaling: RandomScaling,
         AvailableTransforms.RandomCrop: RandomCrop,
         AvailableTransforms.CenterCrop: CenterCrop,
-        AvailableTransforms.Normalize: Normalize
+        AvailableTransforms.Normalize: Normalize,
     }
 
     @staticmethod
@@ -196,7 +219,9 @@ def _convert_transform_str_to_enum(transform_name: str) -> AvailableTransforms:
     raise ValueError(f"{transform_name} is not implemented here.")
 
 
-def get_transforms(transforms: List[Tuple[Union[AvailableTransforms, str], Dict[str, Any]]]) -> Compose:
+def get_transforms(
+    transforms: List[Tuple[Union[AvailableTransforms, str], Dict[str, Any]]]
+) -> Compose:
     if transforms is not None and len(transforms) > 0:
         augments = []
         for transform, transform_kwargs in transforms:

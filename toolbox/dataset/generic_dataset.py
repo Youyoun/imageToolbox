@@ -1,30 +1,34 @@
 import glob
 from pathlib import Path
-from typing import Union, List, Tuple, Dict, Callable
+from typing import Callable, Dict, List, Tuple, Union
 
 import tqdm
 from torch.utils import data as data
 
-from .transforms import get_transforms, AvailableTransforms
 from ..imageOperators import get_clean_image
 from ..utils import get_module_logger
+from .transforms import AvailableTransforms, get_transforms
 
 logger = get_module_logger(__name__)
 
 
 class GenericDataset(data.Dataset):
-    def __init__(self,
-                 root: Union[str, Path],
-                 n_images: int,
-                 clean_transform_fn: Callable,
-                 is_train: bool = True,
-                 augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
-                 load_in_memory: bool = False,
-                 colorized: bool = False):
+    def __init__(
+        self,
+        root: Union[str, Path],
+        n_images: int,
+        clean_transform_fn: Callable,
+        is_train: bool = True,
+        augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
+        load_in_memory: bool = False,
+        colorized: bool = False,
+    ):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train
-        self.im_path = glob.glob(str(self.data_path / "*.jpg")) + glob.glob(str(self.data_path / "*.JPEG"))
+        self.im_path = glob.glob(str(self.data_path / "*.jpg")) + glob.glob(
+            str(self.data_path / "*.JPEG")
+        )
         if n_images > 0:
             self.im_path = self.im_path[: self.n_images]
         self.images = None
@@ -39,7 +43,10 @@ class GenericDataset(data.Dataset):
         self.load_in_memory = load_in_memory
         if self.load_in_memory:
             logger.info("Loading images in memory")
-            self.images = [get_clean_image(im_path, not self.colorized)[1] for im_path in tqdm.tqdm(self.im_path)]
+            self.images = [
+                get_clean_image(im_path, not self.colorized)[1]
+                for im_path in tqdm.tqdm(self.im_path)
+            ]
             self.noisy_images = [self.transform_fn(im) for im in tqdm.tqdm(self.images)]
 
     def __getitem__(self, item):

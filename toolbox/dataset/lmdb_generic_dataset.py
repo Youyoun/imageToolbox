@@ -1,27 +1,28 @@
 from pathlib import Path
-from typing import Union, List, Tuple, Dict, Callable
+from typing import Callable, Dict, List, Tuple, Union
 
 import lmdb
 import six
 from torch.utils import data as data
-
 from tqdm import tqdm
 
-from .lmdb_utils import loads_data
-from .transforms import get_transforms, AvailableTransforms
 from ..imageOperators import get_clean_image
 from ..utils import get_module_logger
+from .lmdb_utils import loads_data
+from .transforms import AvailableTransforms, get_transforms
 
 logger = get_module_logger(__name__)
 
 
 class GenericLMDBDataset(data.Dataset):
-    def __init__(self,
-                 db_path: Union[str, Path],
-                 clean_transform_fn: Callable,
-                 n_images: int = 0,
-                 augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
-                 load_in_memory: bool = False):
+    def __init__(
+        self,
+        db_path: Union[str, Path],
+        clean_transform_fn: Callable,
+        n_images: int = 0,
+        augments: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
+        load_in_memory: bool = False,
+    ):
         self.images = None
         self.noisy_images = None
 
@@ -29,12 +30,12 @@ class GenericLMDBDataset(data.Dataset):
         if self.n_images > 0:
             logger.info(f"Using {self.n_images} images")
         self.db_path = Path(db_path)
-        self.env = lmdb.open(db_path, subdir=False,
-                             readonly=True, lock=False,
-                             readahead=False, meminit=False)
+        self.env = lmdb.open(
+            db_path, subdir=False, readonly=True, lock=False, readahead=False, meminit=False
+        )
         with self.env.begin(write=False) as txn:
-            self.length = loads_data(txn.get(b'__len__'))
-            self.keys = loads_data(txn.get(b'__keys__'))
+            self.length = loads_data(txn.get(b"__len__"))
+            self.keys = loads_data(txn.get(b"__keys__"))
 
         self.transform_fn = clean_transform_fn
         self.transforms = get_transforms(augments)

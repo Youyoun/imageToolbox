@@ -1,16 +1,22 @@
 import glob
 from pathlib import Path
-from typing import Union, List, Tuple, Dict
+from typing import Dict, List, Tuple, Union
 
 import torch
 import torchvision.transforms as T
 from torch.utils import data as data
 
-from ..imageOperators import get_clean_image, get_noisy_image, NoiseModes, get_noise_func, IdentityOperator, \
-    BlurConvolution
+from ..imageOperators import (
+    BlurConvolution,
+    IdentityOperator,
+    NoiseModes,
+    get_clean_image,
+    get_noise_func,
+    get_noisy_image,
+)
 from ..utils import get_module_logger
 from .image_splitter import ImageSplitterOverlapIgnored
-from .transforms import get_transforms, AvailableTransforms
+from .transforms import AvailableTransforms, get_transforms
 
 logger = get_module_logger(__name__)
 
@@ -18,20 +24,22 @@ SCALES = [1.0, 0.9, 0.8, 0.7]
 
 
 class BSD300PatchedNoisyDataset(data.Dataset):
-    def __init__(self,
-                 root: Union[str, Path],
-                 n_images: int,
-                 inner_patch_size: int,
-                 outer_patch_size: int,
-                 blur_type: Union[str,None],
-                 kernel_size: int,
-                 kernel_std: float,
-                 noise_mode: Union[str, NoiseModes],
-                 gaussian_noise_mean: float,
-                 gaussian_noise_std: float,
-                 poisson_noise_scale: float,
-                 is_train: bool = True,
-                 transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
+    def __init__(
+        self,
+        root: Union[str, Path],
+        n_images: int,
+        inner_patch_size: int,
+        outer_patch_size: int,
+        blur_type: Union[str, None],
+        kernel_size: int,
+        kernel_std: float,
+        noise_mode: Union[str, NoiseModes],
+        gaussian_noise_mean: float,
+        gaussian_noise_std: float,
+        poisson_noise_scale: float,
+        is_train: bool = True,
+        transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
+    ):
         self.data_path = Path(root)
         self.n_images = n_images
         self.splitter = ImageSplitterOverlapIgnored(inner_patch_size, outer_patch_size)
@@ -65,17 +73,19 @@ class BSD300PatchedNoisyDataset(data.Dataset):
         self.load_dataset()
 
     def load_dataset(self):
-        im_paths = glob.glob(str(self.data_path / "*.jpg"))[:self.n_images]
+        im_paths = glob.glob(str(self.data_path / "*.jpg"))[: self.n_images]
         for i, p in enumerate(im_paths):
             gray_image, gray_t = get_clean_image(p)
-            noisy_image, noisy_t, BlurrOp = get_noisy_image(gray_t,
-                                                            self.blur_type,
-                                                            self.kernel_size,
-                                                            self.kernel_std,
-                                                            self.noise_mode,
-                                                            self.gaussian_noise_mean,
-                                                            self.gaussian_noise_std,
-                                                            self.poisson_noise_scale)
+            noisy_image, noisy_t, BlurrOp = get_noisy_image(
+                gray_t,
+                self.blur_type,
+                self.kernel_size,
+                self.kernel_std,
+                self.noise_mode,
+                self.gaussian_noise_mean,
+                self.gaussian_noise_std,
+                self.poisson_noise_scale,
+            )
             patches = self.splitter.split_tensor(gray_t)
             self.patches.extend(list(patches.unsqueeze(1)))
             patches = self.splitter.split_tensor(noisy_t)
@@ -89,17 +99,21 @@ class BSD300PatchedNoisyDataset(data.Dataset):
                 for s in SCALES:
                     if s == 1:
                         continue
-                    gray_t = T.F.resize(gray_t,
-                                        [int(gray_t.shape[-2] * s), int(gray_t.shape[-1] * s)],
-                                        interpolation=T.InterpolationMode.NEAREST)
-                    noisy_image, noisy_t, BlurrOp = get_noisy_image(gray_t,
-                                                                    self.blur_type,
-                                                                    self.kernel_size,
-                                                                    self.kernel_std,
-                                                                    self.noise_mode,
-                                                                    self.gaussian_noise_mean,
-                                                                    self.gaussian_noise_std,
-                                                                    self.poisson_noise_scale)
+                    gray_t = T.F.resize(
+                        gray_t,
+                        [int(gray_t.shape[-2] * s), int(gray_t.shape[-1] * s)],
+                        interpolation=T.InterpolationMode.NEAREST,
+                    )
+                    noisy_image, noisy_t, BlurrOp = get_noisy_image(
+                        gray_t,
+                        self.blur_type,
+                        self.kernel_size,
+                        self.kernel_std,
+                        self.noise_mode,
+                        self.gaussian_noise_mean,
+                        self.gaussian_noise_std,
+                        self.poisson_noise_scale,
+                    )
                     patches = self.splitter.split_tensor(gray_t)
                     self.patches.extend(list(patches.unsqueeze(1)))
                     patches = self.splitter.split_tensor(noisy_t)
@@ -126,7 +140,9 @@ class BSD300PatchedNoisyDataset(data.Dataset):
 
     def get_image(self, im_idx):
         clean = self.group_patches(self.patches[self.im_idxs == im_idx], self.im_sizes[im_idx])
-        noisy = self.group_patches(self.noisy_patches[self.im_idxs == im_idx], self.im_sizes[im_idx])
+        noisy = self.group_patches(
+            self.noisy_patches[self.im_idxs == im_idx], self.im_sizes[im_idx]
+        )
         return clean, noisy
 
     def len_images(self):
@@ -137,22 +153,24 @@ class BSD300PatchedNoisyDataset(data.Dataset):
 
 
 class BSD300NoisyDataset(data.Dataset):
-    def __init__(self,
-                 root: Union[str, Path],
-                 n_images: int,
-                 blur_type: Union[str, None],
-                 kernel_size: int,
-                 kernel_std: float,
-                 noise_mode: Union[str, NoiseModes],
-                 gaussian_noise_mean: float,
-                 gaussian_noise_std: float,
-                 poisson_noise_scale: float,
-                 is_train: bool = True,
-                 transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None):
+    def __init__(
+        self,
+        root: Union[str, Path],
+        n_images: int,
+        blur_type: Union[str, None],
+        kernel_size: int,
+        kernel_std: float,
+        noise_mode: Union[str, NoiseModes],
+        gaussian_noise_mean: float,
+        gaussian_noise_std: float,
+        poisson_noise_scale: float,
+        is_train: bool = True,
+        transforms: List[Tuple[Union[AvailableTransforms, str], Dict]] = None,
+    ):
         self.data_path = Path(root)
         self.n_images = n_images
         self.is_train = is_train
-        self.im_path = glob.glob(str(self.data_path / "*.jpg"))[:self.n_images]
+        self.im_path = glob.glob(str(self.data_path / "*.jpg"))[: self.n_images]
 
         # Noise info
         self.blur_type = blur_type
@@ -167,10 +185,12 @@ class BSD300NoisyDataset(data.Dataset):
             self.blur_op = IdentityOperator()
         else:
             self.blur_op = BlurConvolution(kernel_size, blur_type, kernel_std)
-        self.noise_fn = get_noise_func(self.noise_mode,
-                                       self.gaussian_noise_mean,
-                                       self.gaussian_noise_std,
-                                       scale_poisson=self.poisson_noise_scale)
+        self.noise_fn = get_noise_func(
+            self.noise_mode,
+            self.gaussian_noise_mean,
+            self.gaussian_noise_std,
+            scale_poisson=self.poisson_noise_scale,
+        )
 
         self.transforms = get_transforms(transforms)
         logger.info(f"Using Transforms: {self.transforms}")
