@@ -84,21 +84,21 @@ class TsengDescent(BasicSolver):
         :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
         """
         try:
-            r_x = self.regularization.f(xk)
+            r_x = self.regularization.f(xk).item()
         except FunctionNotDefinedError:
             r_x = 0.0
         try:
-            f_x = self.fidelity.f(xk, y=input_vector)
+            f_x = self.fidelity.f(xk, y=input_vector).item()
         except FunctionNotDefinedError:
             f_x = 0.0
 
         return {
-            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector),
-            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x) if real_x is not None else 0,
+            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(xk, xk_old, input_vector).item(),
+            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x).item() if real_x is not None else 0.0,
             "R(x_{k+1})": r_x,
             "F(x_{k+1})": f_x,
             "F(x_{k+1}) + \\lambda R(x_{k+1})": f_x + self.lambda_ * r_x,
-            "SNR": SNR(xk),
+            "SNR": SNR(xk).item(),
         }
 
     def solve(self,
@@ -120,23 +120,23 @@ class TsengDescent(BasicSolver):
         if self.use_armijo:
             armijo = GammaSearch(self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False)
 
-        input_vector = input_vector.to(self.device)
-        xk_old = input_vector.clone()
+        y = input_vector.clone().to(self.device)
+        xk_old = y.clone()
         xk = xk_old
         self.metrics = MetricsDictionary()
         for step in tqdm(range(self.max_iter)):
             if armijo is not None:
-                gamma = armijo.run_search_get_gamma(xk, y=input_vector)
+                gamma = armijo.run_search_get_gamma(xk, y=y)
             # Update (one step)
-            ak = self.operator.grad(xk, y=input_vector)
+            ak = self.operator.grad(xk, y=y)
             zk = self.indicator.prox(xk - gamma * ak)
-            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=input_vector) - ak))
+            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=y) - ak))
 
             # Compute metrics
             if self.do_compute_metrics:
-                self.metrics.add({**self.compute_metrics(xk.cpu(), xk_old.cpu(), input_vector.cpu(), real_x),
+                self.metrics.add({**self.compute_metrics(xk.cpu(), xk_old.cpu(), y.cpu(), real_x),
                                   "gamma": gamma})
-            if compute_relative_difference(xk.cpu(), xk_old.cpu(), input_vector.cpu()) <= _tol:
+            if compute_relative_difference(xk.cpu(), xk_old.cpu(), y.cpu()) <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
             xk_old = xk.clone()
