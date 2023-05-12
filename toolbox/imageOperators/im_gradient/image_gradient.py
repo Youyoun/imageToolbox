@@ -44,8 +44,18 @@ class Gradient:
     def compute(x: torch.Tensor, direction: Directions) -> torch.Tensor:
         _kernel = torch.tensor([-1, 1], dtype=torch.float32)
         x, init_shape = to_4D(x)
-        return F.pad(F.conv2d(x, weight=Gradient.get_kernel(_kernel, direction).to(x.device), stride=1),
-                     Gradient.get_pad(direction), mode=PADDING_MODE).view(*init_shape)
+        return F.pad(
+            F.conv2d(
+                x,
+                weight=Gradient.get_kernel(_kernel, direction)
+                .repeat(x.shape[1], 1, 1, 1)
+                .to(x.device),
+                stride=1,
+                groups=x.shape[1],
+            ),
+            Gradient.get_pad(direction),
+            mode=PADDING_MODE,
+        ).view(*init_shape)
 
 
 class GradientTranspose:
@@ -68,8 +78,14 @@ class GradientTranspose:
     def compute(x: torch.Tensor, direction: Directions) -> torch.Tensor:
         _kernel = torch.tensor([1, -1], dtype=torch.float32)
         x, init_shape = to_4D(x)
-        return F.conv2d(F.pad(x, GradientTranspose.get_pad(direction), mode=PADDING_MODE),
-                        weight=Gradient.get_kernel(_kernel, direction).to(x.device), stride=1).view(*init_shape)
+        return F.conv2d(
+            F.pad(x, GradientTranspose.get_pad(direction), mode=PADDING_MODE),
+            weight=Gradient.get_kernel(_kernel, direction)
+            .repeat(x.shape[1], 1, 1, 1)
+            .to(x.device),
+            stride=1,
+            groups=x.shape[1],
+        ).view(*init_shape)
 
 
 Gradient.T = GradientTranspose
