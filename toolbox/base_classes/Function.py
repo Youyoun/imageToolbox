@@ -12,7 +12,7 @@ class Function(ABC):
     """
 
     def __call__(self, *args, **kwargs):
-        return self.f(*args, **kwargs)
+        return self.grad(*args, **kwargs)
 
     @abstractmethod
     def f(self, *args, **kwargs):
