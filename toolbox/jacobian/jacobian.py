@@ -13,7 +13,9 @@ def Ju(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False)
     """
     # Double backward trick. From https://gist.github.com/apaszke/c7257ac04cb8debb82221764f6d117ad
     w = torch.ones_like(y, requires_grad=True)
-    rop = torch.autograd.grad(torch.autograd.grad(y, x, w, create_graph=True), w, u, create_graph=not is_eval)[0]
+    rop = torch.autograd.grad(
+        torch.autograd.grad(y, x, w, create_graph=True), w, u, create_graph=not is_eval
+    )[0]
     if is_eval:
         w.detach_()
     return rop
@@ -32,7 +34,9 @@ def JTu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False
     return torch.autograd.grad(y, x, u, create_graph=not is_eval, retain_graph=True)[0]
 
 
-def alpha_operator(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, alpha, is_eval: bool = False) -> torch.Tensor:
+def alpha_operator(
+    x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, alpha, is_eval: bool = False
+) -> torch.Tensor:
     """
     Simple transformation: Computed [\alpha * I - 1/2 (J_y(x).T + J_y(x))] @ v
     :param x: input vector (must require grad)
@@ -45,7 +49,9 @@ def alpha_operator(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, alpha, is_
     return alpha * u - sum_J_JT(x, y, u, is_eval)  # JTu(x, y, u, is_eval) - Ju(x, y, u, is_eval)
 
 
-def sum_J_JT(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+def sum_J_JT(
+    x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """
     Returns the additive symmetric form of the jacobian times a certain vector ((M + M^T) / 2)
     The jacobian is evaluated on x according to y (J_y(x)).
@@ -59,7 +65,7 @@ def sum_J_JT(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = 
 
 
 def JTJu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
-    """"
+    """ "
     Returns the jacobian transposed times the jacobian times a certain vector (M^T @ M)
     The jacobian is evaluated on x according to y (J_y(x)).
     :param x: input vector (must require grad)
@@ -82,7 +88,11 @@ def compute_jacobian(net: callable, x: torch.Tensor) -> torch.Tensor:
     bs = x.shape[0]
     size = x.nelement() // bs
     shape_size = len(x.shape) * 2 - 1
-    permute_idx = [shape_size // 2, *list(range(0, shape_size // 2)), *list(range(shape_size // 2 + 1, shape_size))]
+    permute_idx = [
+        shape_size // 2,
+        *list(range(0, shape_size // 2)),
+        *list(range(shape_size // 2 + 1, shape_size)),
+    ]
     return batch_jacobian(net, x).permute(*permute_idx).view(bs, size, size)
 
 

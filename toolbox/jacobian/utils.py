@@ -3,7 +3,7 @@ from typing import Callable, Tuple
 
 import torch
 
-from .jacobian import alpha_operator, sum_J_JT, compute_jacobian
+from .jacobian import alpha_operator, compute_jacobian, sum_J_JT
 from .power_iteration import power_method
 
 POWER_ITER_TOL = 1e-5
@@ -33,12 +33,9 @@ def get_min_max_ev_neuralnet_fulljacobian(net: Callable, x: torch.Tensor) -> Tup
     return all_ev.min(), all_ev.max()
 
 
-def get_lambda_min_or_max_poweriter(model: Callable,
-                                    x: torch.Tensor,
-                                    alpha,
-                                    is_eval=False,
-                                    biggest=False,
-                                    n_iter=50) -> torch.Tensor:
+def get_lambda_min_or_max_poweriter(
+    model: Callable, x: torch.Tensor, alpha, is_eval=False, biggest=False, n_iter=50
+) -> torch.Tensor:
     """
     Small wrapper func that returns either the max or the min eigenvalues of a neural network evaluated on x
     using the power iteration method
@@ -56,7 +53,9 @@ def get_lambda_min_or_max_poweriter(model: Callable,
     y_pred = model(x_detached.view(x.shape)).flatten(start_dim=1)
     if not biggest:
         A_dot_u = lambda u: alpha_operator(x_detached, y_pred, u, alpha, is_eval)
-        return alpha - power_method(x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval)
+        return alpha - power_method(
+            x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval
+        )
     else:
         A_dot_u = lambda u: sum_J_JT(x_detached, y_pred, u, is_eval)
         return power_method(x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval)
@@ -78,13 +77,15 @@ def generate_new_prediction(net: Callable, x: torch.Tensor) -> Tuple[torch.Tenso
 
 def transform_contraint(func: Callable) -> Callable:
     @functools.wraps(func)
-    def wrapper(net: Callable,
-                x: torch.Tensor,
-                eps: float = 0.00,
-                alpha: float = None,
-                max_iters: int = 300,
-                power_iter_tol: float = 1e-5,
-                is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    def wrapper(
+        net: Callable,
+        x: torch.Tensor,
+        eps: float = 0.00,
+        alpha: float = None,
+        max_iters: int = 300,
+        power_iter_tol: float = 1e-5,
+        is_eval: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         EPS = -1 + eps
 
         def two_net_minus_identity(x: torch.Tensor) -> torch.Tensor:

@@ -13,13 +13,15 @@ def penalization(lambda_max, eps, use_relu=True):
         return torch.relu(lambda_max - 1 - eps).max() ** 2
 
 
-def nonexpansive_penalization(net: Callable,
-                              x: torch.Tensor,
-                              eps: float,
-                              alpha: float = None,
-                              n_iters: int = 200,
-                              power_iter_tol: float = 1e-5,
-                              is_eval: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+def nonexpansive_penalization(
+    net: Callable,
+    x: torch.Tensor,
+    eps: float,
+    alpha: float = None,
+    n_iters: int = 200,
+    power_iter_tol: float = 1e-5,
+    is_eval: bool = False,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Computes the nonexpansive penalization for a given neural network and input.
     :param net: The neural network to compute the penalization for.
@@ -41,5 +43,7 @@ def nonexpansive_penalization(net: Callable,
     print((operator(u) - 2 * JTJu(x_new, net(x_new), u, is_eval)).abs().max())
 
     with torch.no_grad():
-        lambda_max = power_method(x_new, operator, n_iters, tol=power_iter_tol, is_eval=is_eval).abs()
+        lambda_max = power_method(
+            x_new, operator, n_iters, tol=power_iter_tol, is_eval=is_eval
+        ).abs()
     return penalization(lambda_max, eps, use_relu=False), lambda_max.max().detach()
