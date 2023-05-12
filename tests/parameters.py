@@ -1,7 +1,7 @@
 from typing import Union
-import pytest
 
 import numpy as np
+import pytest
 import torch
 
 FLOAT_TOL = 1e-4

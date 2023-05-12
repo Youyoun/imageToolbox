@@ -8,9 +8,7 @@ from toolbox.algorithms.tseng_descent import tseng_gradient_descent
 class TestTsengInverse:
     @staticmethod
     def test_tseng_torch_inverse():
-        w_mon = torch.Tensor([[1, 2, 3],
-                              [0, 5, 6],
-                              [0, 0, 9]])
+        w_mon = torch.Tensor([[1, 2, 3], [0, 5, 6], [0, 0, 9]])
         id_ = torch.eye(3)
         w_inv = torch.linalg.inv(w_mon)
         w_t_inv, _ = tseng_gradient_descent(
@@ -21,7 +19,7 @@ class TestTsengInverse:
             lambda_=1.0,
             use_armijo=True,
             max_iter=100,
-            do_compute_metrics=False
+            do_compute_metrics=False,
         )
         assert are_equal(w_inv, w_t_inv)
 
@@ -44,7 +42,7 @@ class TestTsengInverse:
             lambda_=1.0,
             use_armijo=True,
             max_iter=30000,
-            do_compute_metrics=False
+            do_compute_metrics=False,
         )
         assert are_equal(w_inv, w_t_inv), f"{abs(w_inv - w_t_inv).max()}"
 
@@ -69,7 +67,7 @@ class TestTsengConvergence:
             lambda_=1.0,
             use_armijo=True,
             max_iter=2000,
-            do_compute_metrics=False
+            do_compute_metrics=False,
         )
         assert are_equal(y_, torch.zeros_like(y_)), f"{abs(y_).max()}"
 
@@ -92,7 +90,7 @@ class TestTsengConvergence:
             lambda_=1.0,
             use_armijo=True,
             max_iter=2000,
-            do_compute_metrics=False
+            do_compute_metrics=False,
         )
         assert are_equal(y_, torch.ones_like(y_)), f"{abs(y_ - torch.ones_like(y_)).max()}"
 
@@ -116,6 +114,6 @@ class TestTsengConvergence:
             lambda_=1.0,
             use_armijo=True,
             max_iter=2000,
-            do_compute_metrics=False
+            do_compute_metrics=False,
         )
         assert are_equal(y_, Y), f"{abs(y_ - Y).max()}"

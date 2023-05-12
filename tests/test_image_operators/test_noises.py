@@ -6,8 +6,8 @@ import torchvision.transforms as ttransforms
 from PIL import Image
 from scipy.stats import shapiro
 
-from toolbox.imageOperators import get_noise_func, NoiseModes, get_clean_image
 from tests.parameters import BATCH_SIZE, are_equal
+from toolbox.imageOperators import NoiseModes, get_clean_image, get_noise_func
 
 POISSON_SIMILARITY_THRESH = 2
 
@@ -19,7 +19,7 @@ class TestCleanImageLoading:
 
     @staticmethod
     def test_get_clean_image():
-        cat_im = Image.open(Path(__file__).parent / "chelseaColor.png").convert('L')
+        cat_im = Image.open(Path(__file__).parent / "chelseaColor.png").convert("L")
         cat_t = ttransforms.ToTensor()(cat_im)
         cat_im_test, cat_t_test = get_clean_image(Path(__file__).parent / "chelseaColor.png")
         assert are_equal(cat_t_test, cat_t)
@@ -111,5 +111,7 @@ class TestNoiseApplicationBW:
                     continue
                 mean_ = same_intensity_pixels.mean()
                 assert torch.abs(mean_ - i) / mean_ < POISSON_SIMILARITY_THRESH, i
-                assert torch.abs(same_intensity_pixels.var() - i) / mean_ < POISSON_SIMILARITY_THRESH, i
+                assert (
+                    torch.abs(same_intensity_pixels.var() - i) / mean_ < POISSON_SIMILARITY_THRESH
+                ), i
         assert not are_equal(y, x)
