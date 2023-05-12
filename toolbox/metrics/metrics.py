@@ -1,5 +1,6 @@
 import abc
-from typing import Any, List, Dict
+from pathlib import Path
+from typing import Any, List, Dict, Union
 
 import numpy as np
 
@@ -91,6 +92,7 @@ class MetricsDictionary(MetricsAggregator):
     Compute a dictionary of MetricArray objects from a dictionary of {metrics: values}
     Returns a dictionary of {metrics: [values]}
     """
+
     def __init__(self):
         self.metrics: Dict[Any, MetricArray] = {}
 
@@ -110,12 +112,29 @@ class MetricsDictionary(MetricsAggregator):
         for k in self.metrics:
             self.metrics[k].init()
 
+    def save(self, path: Union[str, Path]) -> None:
+        import json
+        with open(path, 'w') as f:
+            json.dump(self.get_all(), f)
+
+    @classmethod
+    def load(cls, path: Union[str, Path]) -> 'MetricsDictionary':
+        import json
+        with open(path, 'r') as f:
+            metrics = json.load(f)
+        metrics_dic = cls()
+        for k, v in metrics.items():
+            metrics_dic.metrics[k] = MetricArray()
+            metrics_dic.metrics[k].value_array = v
+        return metrics_dic
+
 
 class AverageMetricsDictionary(MetricsAggregator):
     """
     Compute a dictionary of MetricAverage objects from a dictionary of {metrics: values}
     Returns a dictionary of {metrics: average}
     """
+
     def __init__(self):
         self.metrics: Dict[Any, MetricAverage] = {}
 
