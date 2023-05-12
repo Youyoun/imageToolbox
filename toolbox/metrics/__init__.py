@@ -1,3 +1,15 @@
-from .metrics import AverageMetricsDictionary, MetricAverage, MetricsDictionary, MetricArray
-from .compute_metrics import MetricNames, mean_squared_error, mean_absolute_error, compute_relative_difference, PSNR, \
-    SNR, SSIM
+from .compute_metrics import (
+    PSNR,
+    SNR,
+    SSIM,
+    MetricNames,
+    compute_relative_difference,
+    mean_absolute_error,
+    mean_squared_error,
+)
+from .metrics import (
+    AverageMetricsDictionary,
+    MetricArray,
+    MetricAverage,
+    MetricsDictionary,
+)

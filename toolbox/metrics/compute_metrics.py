@@ -23,7 +23,9 @@ class MetricNames(Enum):
     EIGENVALUE = auto()
 
 
-def mean_squared_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]) -> float:
+def mean_squared_error(
+    tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]
+) -> float:
     """
     Compute the mean squared error between two tensors or numpy arrays.
     Wrapper around np.linalg.norm.
@@ -35,7 +37,9 @@ def mean_squared_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[
     return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) ** 2 / tensor1.size
 
 
-def mean_absolute_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]) -> float:
+def mean_absolute_error(
+    tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union[torch.Tensor, np.ndarray]
+) -> float:
     """
     Compute the mean absolute error between two tensors or numpy arrays.
     Wrapper around np.linalg.norm.
@@ -47,9 +51,11 @@ def mean_absolute_error(tensor1: Union[torch.Tensor, np.ndarray], tensor2: Union
     return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=1) / tensor1.size
 
 
-def compute_relative_difference(tensor1: Union[torch.Tensor, np.ndarray],
-                                tensor2: Union[torch.Tensor, np.ndarray],
-                                reference_vector: Union[torch.Tensor, np.ndarray] = None) -> float:
+def compute_relative_difference(
+    tensor1: Union[torch.Tensor, np.ndarray],
+    tensor2: Union[torch.Tensor, np.ndarray],
+    reference_vector: Union[torch.Tensor, np.ndarray] = None,
+) -> float:
     """
     Compute the relative difference between two tensors or numpy arrays.
     Wrapper around np.linalg.norm.
@@ -61,11 +67,15 @@ def compute_relative_difference(tensor1: Union[torch.Tensor, np.ndarray],
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
     if reference_vector is None:
         reference_vector = tensor1
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) / np.linalg.norm(reference_vector.flatten(),
-                                                                                         ord=2)
+    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) / np.linalg.norm(
+        reference_vector.flatten(), ord=2
+    )
 
 
-def PSNR(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.Tensor, np.ndarray]) -> float:
+def PSNR(
+    tensor_true: Union[torch.Tensor, np.ndarray],
+    tensor_test: Union[torch.Tensor, np.ndarray],
+) -> float:
     """
     Compute the peak signal-to-noise ratio (PSNR) between two tensors or numpy arrays.
     Wrapper around skimage.metrics.peak_signal_noise_ratio.
@@ -77,7 +87,10 @@ def PSNR(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.
     return peak_signal_noise_ratio(tensor_true, tensor_test)
 
 
-def SSIM(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.Tensor, np.ndarray]) -> float:
+def SSIM(
+    tensor_true: Union[torch.Tensor, np.ndarray],
+    tensor_test: Union[torch.Tensor, np.ndarray],
+) -> float:
     """
     Compute the structural similarity index (SSIM) between two tensors or numpy arrays.
     Wrapper around skimage.metrics.structural_similarity.
@@ -86,7 +99,11 @@ def SSIM(tensor_true: Union[torch.Tensor, np.ndarray], tensor_test: Union[torch.
     :return: SSIM
     """
     tensor_true, tensor_test = to_numpy_if_tensor(tensor_true, tensor_test)
-    return structural_similarity(tensor_true, tensor_test)
+    return structural_similarity(
+        tensor_true,
+        tensor_test,
+        channel_axis=0 if len(tensor_test.shape) == 3 else None,
+    )
 
 
 def SNR(tensor: Union[torch.Tensor, np.ndarray]) -> float:
