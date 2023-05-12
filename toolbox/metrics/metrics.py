@@ -1,6 +1,6 @@
 import abc
 from pathlib import Path
-from typing import Any, List, Dict, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 
@@ -114,13 +114,15 @@ class MetricsDictionary(MetricsAggregator):
 
     def save(self, path: Union[str, Path]) -> None:
         import json
-        with open(path, 'w') as f:
+
+        with open(path, "w") as f:
             json.dump(self.get_all(), f)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> 'MetricsDictionary':
+    def load(cls, path: Union[str, Path]) -> "MetricsDictionary":
         import json
-        with open(path, 'r') as f:
+
+        with open(path, "r") as f:
             metrics = json.load(f)
         metrics_dic = cls()
         for k, v in metrics.items():
