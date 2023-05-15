@@ -67,6 +67,7 @@ class TsengDescent(BasicSolver):
         do_compute_metrics: bool = True,
         indicator_fn: ProximityOp = Identity(),
         device: str = "cpu",
+        random_init: bool = False,
     ):
         super().__init__()
         self.fidelity = fidelity
@@ -74,6 +75,7 @@ class TsengDescent(BasicSolver):
         self.operator = TsengOperator(self.fidelity, self.regularization, lambda_)
         self.indicator = indicator_fn
         self.device = device
+        self.random_init = random_init
 
         self.gamma = gamma
         self.lambda_ = lambda_
@@ -135,10 +137,11 @@ class TsengDescent(BasicSolver):
         _tol = 1e-8
         logger.info("Running Tseng's gradient descent algorithm...")
         logger.debug(
-            f"Parameters: gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}"
+            f"Parameters: Armijo: {self.use_armijo} gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}"
         )
         logger.debug(f"Input vector shape: {input_vector.shape}")
         logger.debug(f"Running on device {self.device}")
+        logger.debug(f"Using indicator function: {self.indicator}")
         armijo = None
         gamma = self.gamma
         if self.use_armijo:
@@ -146,7 +149,10 @@ class TsengDescent(BasicSolver):
                 self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False
             )
 
-        y = input_vector.clone().to(self.device)
+        if self.random_init:
+            y = torch.randn_like(input_vector).to(self.device) * 1e-3
+        else:
+            y = input_vector.clone().to(self.device)
         xk_old = y.clone()
         xk = xk_old
         self.metrics = MetricsDictionary()
