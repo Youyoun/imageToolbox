@@ -12,12 +12,12 @@ MIN_POWER_ITERS = 10
 
 def batch_norm(tensor_: torch.Tensor) -> torch.Tensor:
     init_shape = tensor_.shape
-    return torch.norm(tensor_.view(init_shape[0], -1), dim=1).view(init_shape[0], -1)
+    return torch.norm(tensor_.reshape(init_shape[0], -1), dim=1).reshape(init_shape[0], -1)
 
 
 def batch_normalize_vector(vector: torch.Tensor) -> torch.Tensor:
     init_shape = vector.shape
-    return (vector.view(init_shape[0], -1) / batch_norm(vector)).view(*init_shape)
+    return (vector.reshape(init_shape[0], -1) / batch_norm(vector)).reshape(*init_shape)
 
 
 def power_method(
