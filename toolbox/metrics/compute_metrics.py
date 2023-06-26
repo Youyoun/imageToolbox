@@ -2,6 +2,7 @@ from enum import Enum, auto
 from typing import Union
 
 import numpy as np
+import numpy.typing
 import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
@@ -34,7 +35,9 @@ def mean_squared_error(
     :return: Mean squared error = ||tensor1 - tensor2||_2^2 / N
     """
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) ** 2 / tensor1.size
+    return (
+        np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) ** 2 / tensor1.size
+    ).item()
 
 
 def mean_absolute_error(
@@ -48,13 +51,15 @@ def mean_absolute_error(
     :return: Mean absolute error = ||tensor1 - tensor2||_1 / N
     """
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=1) / tensor1.size
+    return (
+        np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=1) / tensor1.size
+    ).item()
 
 
 def compute_relative_difference(
     tensor1: Union[torch.Tensor, np.ndarray],
     tensor2: Union[torch.Tensor, np.ndarray],
-    reference_vector: Union[torch.Tensor, np.ndarray] = None,
+    reference_vector: Union[torch.Tensor, np.ndarray, None] = None,
 ) -> float:
     """
     Compute the relative difference between two tensors or numpy arrays.
@@ -67,9 +72,10 @@ def compute_relative_difference(
     tensor1, tensor2 = to_numpy_if_tensor(tensor1, tensor2)
     if reference_vector is None:
         reference_vector = tensor1
-    return np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2) / np.linalg.norm(
-        reference_vector.flatten(), ord=2
-    )
+    return (
+        np.linalg.norm(tensor1.flatten() - tensor2.flatten(), ord=2)
+        / np.linalg.norm(reference_vector.flatten(), ord=2)
+    ).item()
 
 
 def PSNR(
@@ -112,5 +118,5 @@ def SNR(tensor: Union[torch.Tensor, np.ndarray]) -> float:
     :param tensor: Tensor.
     :return: SNR = 10 * log10(mean(I) / std(I))
     """
-    tensor = to_numpy_if_tensor(tensor)
+    (tensor,) = to_numpy_if_tensor(tensor)
     return 10 * np.log10(np.mean(tensor) / np.std(tensor))
