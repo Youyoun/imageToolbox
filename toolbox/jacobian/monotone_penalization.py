@@ -146,6 +146,7 @@ class MonotonyRegularization(nn.Module):
                 power_method(
                     x_new, operator, self.max_iters, tol=self.power_iter_tol, is_eval=True
                 )
+                .abs()
                 .max()
                 .item()
             )
