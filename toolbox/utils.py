@@ -96,3 +96,7 @@ class StrEnum(str, enum.Enum):
         Return the lower-cased version of the member name.
         """
         return name.lower()
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
