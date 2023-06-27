@@ -45,14 +45,16 @@ class MonotonyRegularization(nn.Module):
         self.eps = eps
         self.alpha = alpha
         self.max_iters = max_iter
-        self.eval = eval_mode
+        self.is_eval = eval_mode
         self.power_iter_tol = power_iter_tol
         self.use_relu = use_relu_penalization
         logger.debug(
             f"Using {self.method.name} for computing regularisation. Tolerance for PI: {self.power_iter_tol}"
         )
 
-    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, model: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return self._monotonicity_penalization(model, x)
 
     def _penalization_fulljacobian(
@@ -65,9 +67,12 @@ class MonotonyRegularization(nn.Module):
         :return: Penalization value and lambda min
         """
         all_ev = get_neuralnet_jacobian_ev(net, x)
-        if self.eval:
+        if self.is_eval:
             all_ev.detach_()
-        return penalization(all_ev.min(), self.eps, use_relu=self.use_relu), all_ev.min().detach()
+        return (
+            penalization(all_ev.min(), self.eps, use_relu=self.use_relu),
+            all_ev.min().detach(),
+        )
 
     def _penalization_powermethod(
         self, net: Callable, x: torch.Tensor
@@ -83,12 +88,19 @@ class MonotonyRegularization(nn.Module):
         y_new = net(x_new)
 
         def operator(u):
-            return alpha_operator(x_new, y_new, u, self.alpha, self.eval)
+            return alpha_operator(x_new, y_new, u, self.alpha, self.is_eval)
 
         lambda_min = self.alpha - power_method(
-            x_new, operator, self.max_iters, tol=self.power_iter_tol, is_eval=self.eval
+            x_new,
+            operator,
+            self.max_iters,
+            tol=self.power_iter_tol,
+            is_eval=self.is_eval,
         )
-        return penalization(lambda_min, self.eps, self.use_relu), lambda_min.min().detach()
+        return (
+            penalization(lambda_min, self.eps, self.use_relu),
+            lambda_min.min().detach(),
+        )
 
     def _penalization_optpowermethod(
         self, net: Callable, x: torch.Tensor
@@ -105,7 +117,7 @@ class MonotonyRegularization(nn.Module):
         y_new = net(x_new)
 
         def operator(u):
-            return alpha_operator(x_new, y_new, u, self.alpha, self.eval)
+            return alpha_operator(x_new, y_new, u, self.alpha, self.is_eval)
 
         with torch.no_grad():
             vectors, _ = power_method(
@@ -116,12 +128,17 @@ class MonotonyRegularization(nn.Module):
                 is_eval=True,
                 return_vector=True,
             )
-        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
+        vtOv = torch.sum(
+            (vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1
+        )
         vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
         lambda_min = (self.alpha - rayleigh_coeff).min()
-        return penalization(lambda_min, self.eps, self.use_relu), lambda_min.min().detach()
+        return (
+            penalization(lambda_min, self.eps, self.use_relu),
+            lambda_min.min().detach(),
+        )
 
     def _penalization_optpowermethod_noalpha(
         self, net: Callable, x: torch.Tensor
@@ -139,12 +156,16 @@ class MonotonyRegularization(nn.Module):
         y_new = net(x_new)
 
         def operator(u):
-            return sum_J_JT(x_new, y_new, u, self.eval)
+            return sum_J_JT(x_new, y_new, u, self.is_eval)
 
         with torch.no_grad():
             lambda_max = (
                 power_method(
-                    x_new, operator, self.max_iters, tol=self.power_iter_tol, is_eval=True
+                    x_new,
+                    operator,
+                    self.max_iters,
+                    tol=self.power_iter_tol,
+                    is_eval=True,
                 )
                 .abs()
                 .max()
@@ -196,7 +217,13 @@ class MonotonyRegularizationShift(MonotonyRegularization):
         use_relu_penalization: bool = False,
     ):
         super().__init__(
-            method, -1 + eps, alpha, max_iter, power_iter_tol, eval_mode, use_relu_penalization
+            method,
+            -1 + eps,
+            alpha,
+            max_iter,
+            power_iter_tol,
+            eval_mode,
+            use_relu_penalization,
         )
 
     @staticmethod
@@ -206,5 +233,9 @@ class MonotonyRegularizationShift(MonotonyRegularization):
 
         return two_net_minus_identity
 
-    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self._monotonicity_penalization(MonotonyRegularizationShift.shift_model(model), x)
+    def forward(
+        self, model: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        return self._monotonicity_penalization(
+            MonotonyRegularizationShift.shift_model(model), x
+        )
