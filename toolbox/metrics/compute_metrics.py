@@ -2,7 +2,6 @@ from enum import Enum, auto
 from typing import Union
 
 import numpy as np
-import numpy.typing
 import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
@@ -119,4 +118,4 @@ def SNR(tensor: Union[torch.Tensor, np.ndarray]) -> float:
     :return: SNR = 10 * log10(mean(I) / std(I))
     """
     (tensor,) = to_numpy_if_tensor(tensor)
-    return 10 * np.log10(np.mean(tensor) / np.std(tensor))
+    return 10 * np.log10(np.mean(tensor) / np.std(tensor)).item()
