@@ -1,7 +1,6 @@
 import torch
 
-from ..base_classes import Fidelity
-from ..imageOperators import BlurConvolution
+from ..base_classes import Fidelity, Operator
 
 
 class LpFidelity(Fidelity):
@@ -11,7 +10,7 @@ class LpFidelity(Fidelity):
     For p = 2, this is the L2 fidelity term.
     """
 
-    def __init__(self, h: BlurConvolution, p: int = 2):
+    def __init__(self, h: Operator, p: int = 2):
         self.H = h
         self.p = p
 
@@ -35,5 +34,5 @@ class L2Fidelity(LpFidelity):
     Wraps the LpFidelity class with p = 2
     """
 
-    def __init__(self, h: BlurConvolution):
+    def __init__(self, h: Operator):
         super().__init__(h, 2)
