@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Literal, Union, Tuple, overload
 
 import numpy as np
 import torch
@@ -12,12 +12,50 @@ MIN_POWER_ITERS = 10
 
 def batch_norm(tensor_: torch.Tensor) -> torch.Tensor:
     init_shape = tensor_.shape
-    return torch.norm(tensor_.reshape(init_shape[0], -1), dim=1).reshape(init_shape[0], -1)
+    return torch.norm(tensor_.reshape(init_shape[0], -1), dim=1).reshape(
+        init_shape[0], -1
+    )
 
 
 def batch_normalize_vector(vector: torch.Tensor) -> torch.Tensor:
     init_shape = vector.shape
     return (vector.reshape(init_shape[0], -1) / batch_norm(vector)).reshape(*init_shape)
+
+
+@overload
+def power_method(
+    x: torch.Tensor,
+    operator: Callable,
+    max_iter: int = 10,
+    tol: float = 1e-10,
+    is_eval: bool = False,
+    return_vector: Literal[False] = False,
+) -> torch.Tensor:
+    ...
+
+
+@overload
+def power_method(
+    x: torch.Tensor,
+    operator: Callable,
+    max_iter: int = 10,
+    tol: float = 1e-10,
+    is_eval: bool = False,
+    return_vector: Literal[True] = True,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    ...
+
+
+@overload
+def power_method(
+    x: torch.Tensor,
+    operator: Callable,
+    max_iter: int = 10,
+    tol: float = 1e-10,
+    is_eval: bool = False,
+    return_vector: bool = False,
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    ...
 
 
 def power_method(
@@ -27,7 +65,7 @@ def power_method(
     tol: float = 1e-10,
     is_eval: bool = False,
     return_vector: bool = False,
-):
+) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
     """
     Use the power method to compute the largest eigen value (in magnitude)
     :param x: input vector of shape (BATCH, N) where N is the number of pixel in an image (flatten)
