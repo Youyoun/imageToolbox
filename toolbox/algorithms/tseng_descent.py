@@ -1,7 +1,10 @@
 from typing import Callable, Dict, Tuple, Union
 
+import imageio
 import numpy as np
 import torch
+import torchvision
+from PIL import ImageDraw
 from tqdm import tqdm
 
 from ..base_classes import (
@@ -12,7 +15,9 @@ from ..base_classes import (
     ProximityOp,
     Regularization,
 )
+from ..jacobian import MonotonyRegularization, PenalizationMethods
 from ..metrics import (
+    PSNR,
     SNR,
     MetricsDictionary,
     compute_relative_difference,
@@ -66,8 +71,9 @@ class TsengDescent(BasicSolver):
         use_armijo: bool = True,
         do_compute_metrics: bool = True,
         indicator_fn: ProximityOp = Identity(),
-        device: str = "cpu",
+        device: Union[str, torch.device] = "cpu",
         random_init: bool = False,
+        n_step_test_monotony: int = 0,
     ):
         super().__init__()
         self.fidelity = fidelity
@@ -83,6 +89,14 @@ class TsengDescent(BasicSolver):
         self.use_armijo = use_armijo
         self.do_compute_metrics = do_compute_metrics
 
+        self.n_test_monotony = n_step_test_monotony
+        self.n_iter = 0
+        self.monotony_fn = None
+        if self.n_test_monotony > 0:
+            self.monotony_fn = MonotonyRegularization(
+                PenalizationMethods.OPTPOWERNOALPHA, 0.0, 0.0, 500, eval_mode=True
+            )
+
         self.metrics = None
         if self.do_compute_metrics:
             self.metrics = MetricsDictionary()
@@ -92,7 +106,7 @@ class TsengDescent(BasicSolver):
         xk: torch.Tensor,
         xk_old: torch.Tensor,
         input_vector: torch.Tensor,
-        real_x: torch.Tensor,
+        real_x: Union[torch.Tensor, None],
     ) -> Dict[str, float]:
         """
         Compute metrics.
@@ -101,32 +115,32 @@ class TsengDescent(BasicSolver):
         :param input_vector: Input vector.
         :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
         """
-        try:
-            r_x = self.regularization.f(xk).item()
-        except FunctionNotDefinedError:
-            r_x = 0.0
-        try:
-            f_x = self.fidelity.f(xk, y=input_vector).item()
-        except FunctionNotDefinedError:
-            f_x = 0.0
+        metrics_dict = {}
 
-        return {
-            "||x_{k+1} - x_k||_2 / ||y||_2": compute_relative_difference(
-                xk, xk_old, input_vector
-            ).item(),
-            "||x_{k+1} - x||_1": mean_absolute_error(xk, real_x).item()
-            if real_x is not None
-            else 0.0,
-            "R(x_{k+1})": r_x,
-            "F(x_{k+1})": f_x,
-            "F(x_{k+1}) + \\lambda R(x_{k+1})": f_x + self.lambda_ * r_x,
-            "SNR": SNR(xk).item(),
-        }
+        try:
+            metrics_dict["R(x_{k+1})"] = self.regularization.f(xk).item()
+        except FunctionNotDefinedError:
+            pass
+        try:
+            metrics_dict["F(x_{k+1})"] = self.fidelity.f(xk, y=input_vector).item()
+        except FunctionNotDefinedError:
+            pass
+
+        metrics_dict["||x_{k+1} - x_k||_2 / ||y||_2"] = compute_relative_difference(
+            xk, xk_old, input_vector
+        )
+        if real_x is not None:
+            metrics_dict["||x_{k+1} - x||_1"] = mean_absolute_error(xk, real_x)
+            metrics_dict["PSNR"] = PSNR(real_x, xk)
+
+        metrics_dict["SNR"] = SNR(xk)
+        return metrics_dict
 
     def solve(
         self,
         input_vector: torch.Tensor,
-        real_x: torch.Tensor = None,
+        real_x: Union[torch.Tensor, None] = None,
+        save_gif_path: Union[str, None] = None,
     ) -> Tuple[torch.Tensor, MetricsDictionary]:
         """
         Tseng's gradient descent algorithm.
@@ -134,7 +148,7 @@ class TsengDescent(BasicSolver):
         :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
         :return: Last iterate and metrics dictionary.
         """
-        _tol = 1e-8
+        _tol = 1e-5
         logger.info("Running Tseng's gradient descent algorithm...")
         logger.debug(
             f"Parameters: Armijo: {self.use_armijo} gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}"
@@ -146,8 +160,15 @@ class TsengDescent(BasicSolver):
         gamma = self.gamma
         if self.use_armijo:
             armijo = GammaSearch(
-                self.operator, sigma=self.gamma, gamma_min=1e-6, reset_each_search=False
+                self.operator,
+                sigma=self.gamma,
+                gamma_min=1e-6,
+                reset_each_search=True,
+                theta=0.9,
+                beta=0.5,
             )
+
+        images = []
 
         if self.random_init:
             y = torch.randn_like(input_vector).to(self.device) * 1e-3
@@ -161,8 +182,17 @@ class TsengDescent(BasicSolver):
                 gamma = armijo.run_search_get_gamma(xk, y=y)
             # Update (one step)
             ak = self.operator.grad(xk, y=y)
-            zk = self.indicator.prox(xk - gamma * ak)
-            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=y) - ak))
+            zk = self.indicator.prox(xk - gamma * ak, float("nan"))
+            xk = self.indicator.prox(
+                zk - gamma * (self.operator.grad(zk, y=y) - ak), float("nan")
+            )
+
+            if save_gif_path is not None:
+                im = torchvision.transforms.ToPILImage()(xk.cpu().squeeze(0))
+                ImageDraw.Draw(im).text(
+                    (10, 10), f"Step {step}", fill=(255, 255, 255, 128)
+                )
+                images.append(im)
 
             # Compute metrics
             if self.do_compute_metrics:
@@ -172,27 +202,50 @@ class TsengDescent(BasicSolver):
                         "gamma": gamma,
                     }
                 )
+            # Test monotony
+            if self.monotony_fn is not None and step % self.n_test_monotony == 0:
+                logger.debug(f"Testing monotony at step {step}")
+                logger.debug("Testing monotony for operator...")
+                _, l_min_op = self.monotony_fn(
+                    lambda x: self.operator.grad(x, y), xk.detach()
+                )
+                logger.debug("Testing monotony for regularization...")
+                _, l_min_reg = self.monotony_fn(self.operator.reg.grad, xk.detach())
+                self.metrics.add(
+                    {
+                        "\lambda_{min}(A+\nabla h)": l_min_op.item(),
+                        "\lambda_{min}(\nabla h)": l_min_reg.item(),
+                    }
+                )
+
             if compute_relative_difference(xk.cpu(), xk_old.cpu(), y.cpu()) <= _tol:
                 print(f"Descent reached tolerance={_tol} at step {step}")
                 break
             xk_old = xk.clone()
+        if save_gif_path is not None:
+            logger.debug(f"Saving GIF to {save_gif_path}")
+            imageio.mimsave(
+                save_gif_path,
+                images,
+                fps=50,
+            )
         return xk.cpu(), self.metrics
 
 
 def tseng_gradient_descent(
-    input_vector: Union[np.ndarray, torch.Tensor],
+    input_vector: torch.Tensor,
     fidelity_gradient: Callable,
     regularization_gradient: Callable,
     gamma: float,
     lambda_: float,
     use_armijo: bool = False,
     max_iter: int = 1000,
-    real_x: np.ndarray = None,
-    regularization_function: Callable = None,
-    fidelity_function: Callable = None,
+    real_x: Union[torch.Tensor, None] = None,
+    regularization_function: Union[Regularization, None] = None,
+    fidelity_function: Union[Fidelity, None] = None,
     do_compute_metrics: bool = True,
     indicator: ProximityOp = Identity(),
-    device: str = "cpu",
+    device: Union[str, torch.device] = "cpu",
 ) -> Tuple[Union[np.ndarray, torch.Tensor], MetricsDictionary]:
     """
     Tseng's gradient descent algorithm.
@@ -239,7 +292,7 @@ class GammaSearch:
         sigma: float = 1,
         gamma_min: float = 1e-4,
         reset_each_search: bool = False,
-        projection: ProximityOp = None,
+        projection: ProximityOp = Identity(),
     ):
         """
         Gamma search for the Tseng's gradient descent algorithm. The search is based on the Armijo rule. The search is
@@ -303,7 +356,7 @@ class GammaSearch:
             nabla_f = self.operator.grad(x, y)
 
             # proj_C(x_k - \gamma A(x_k)
-            Zc = self.projection.prox(x - self.gamma * nabla_f)
+            Zc = self.projection.prox(x - self.gamma * nabla_f, float("nan"))
 
             # \gamma ||A(Z_C(x_k, y)) - A(x_k)||
             diff_op = self.gamma * torch.linalg.norm(
