@@ -1,8 +1,12 @@
+from typing import Callable
+
 import torch
 from torch.autograd.functional import jacobian
 
 
-def Ju(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+def Ju(
+    x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """
     Returns the jacobian vector product. The jacobian is evaluated on x according to y (J_y(x)).
     :param x: input vector (must require grad)
@@ -21,7 +25,9 @@ def Ju(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False)
     return rop
 
 
-def JTu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+def JTu(
+    x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """
     Returns the jacobian transposed vector product (Equivalent to Lop).
     The jacobian is evaluated on x according to y (J_y(x)) and then transposed.
@@ -46,7 +52,9 @@ def alpha_operator(
     :param alpha: floating by which to shift the Jacobian
     :return: \alpha * u - (J_y(x).T + J_y(x)) @ u
     """
-    return alpha * u - sum_J_JT(x, y, u, is_eval)  # JTu(x, y, u, is_eval) - Ju(x, y, u, is_eval)
+    return alpha * u - sum_J_JT(
+        x, y, u, is_eval
+    )  # JTu(x, y, u, is_eval) - Ju(x, y, u, is_eval)
 
 
 def sum_J_JT(
@@ -64,7 +72,9 @@ def sum_J_JT(
     return 1 / 2 * (Ju(x, y, u, is_eval) + JTu(x, y, u, is_eval))
 
 
-def JTJu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+def JTJu(
+    x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """ "
     Returns the jacobian transposed times the jacobian times a certain vector (M^T @ M)
     The jacobian is evaluated on x according to y (J_y(x)).
@@ -77,7 +87,9 @@ def JTJu(x: torch.Tensor, y: torch.Tensor, u: torch.Tensor, is_eval: bool = Fals
     return JTu(x, y, Ju(x, y, u, is_eval=is_eval), is_eval=is_eval)
 
 
-def compute_jacobian(net: callable, x: torch.Tensor) -> torch.Tensor:
+def compute_jacobian(
+    net: Callable, x: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """
     Compute the exact jacobian of the neural network (callable function at least)
     Be careful, the size of the matrix is too big (And so the computation is too slow for images of a certain size)
@@ -93,10 +105,10 @@ def compute_jacobian(net: callable, x: torch.Tensor) -> torch.Tensor:
         *list(range(0, shape_size // 2)),
         *list(range(shape_size // 2 + 1, shape_size)),
     ]
-    return batch_jacobian(net, x).permute(*permute_idx).view(bs, size, size)
+    return batch_jacobian(net, x, is_eval).permute(*permute_idx).view(bs, size, size)
 
 
-def batch_jacobian(f: callable, x: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
+def batch_jacobian(f: Callable, x: torch.Tensor, is_eval: bool = False) -> torch.Tensor:
     """
     Compute the jacobian on a batch of data using a simple trick.
     :param f: callable function or neural network nn.Module

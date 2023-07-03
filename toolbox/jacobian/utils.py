@@ -9,19 +9,25 @@ from .power_iteration import power_method
 POWER_ITER_TOL = 1e-5
 
 
-def get_neuralnet_jacobian_ev(net: Callable, x: torch.Tensor) -> torch.Tensor:
+def get_neuralnet_jacobian_ev(
+    net: Callable, x: torch.Tensor, is_eval: bool = False
+) -> torch.Tensor:
     """
     Compute jacobian evaluated on x and then return all its eigenvalues (EV decomposition)
     :param net: Callable method, takes as input x and returns a vector of similar shape
     :param x: input vector
     :return: tensor of 1-dim containing all the eigenvalues (size = nelement(x))
     """
-    J = compute_jacobian(net, x)
+    J = compute_jacobian(net, x, is_eval=is_eval)
+    if is_eval:
+        J = J.detach()
     all_ev, _ = torch.linalg.eigh(1 / 2 * (J + J.transpose(1, 2)))
     return all_ev
 
 
-def get_min_max_ev_neuralnet_fulljacobian(net: Callable, x: torch.Tensor) -> Tuple[float, float]:
+def get_min_max_ev_neuralnet_fulljacobian(
+    net: Callable, x: torch.Tensor, is_eval: bool = False
+) -> Tuple[float, float]:
     """
     Small wrapper func that returns the max and min eigenvalues of a neural network evaluated on x
     by computing the full jacobian and its decompostion.
@@ -29,8 +35,8 @@ def get_min_max_ev_neuralnet_fulljacobian(net: Callable, x: torch.Tensor) -> Tup
     :param x: input vector
     :return: Tuple[\lambda_{min}, \lambda_{max}]
     """
-    all_ev = get_neuralnet_jacobian_ev(net, x)
-    return all_ev.min(), all_ev.max()
+    all_ev = get_neuralnet_jacobian_ev(net, x, is_eval=is_eval)
+    return all_ev.min().item(), all_ev.max().item()
 
 
 def get_lambda_min_or_max_poweriter(
@@ -58,10 +64,14 @@ def get_lambda_min_or_max_poweriter(
         )
     else:
         A_dot_u = lambda u: sum_J_JT(x_detached, y_pred, u, is_eval)
-        return power_method(x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval)
+        return power_method(
+            x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval
+        )
 
 
-def generate_new_prediction(net: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+def generate_new_prediction(
+    net: Callable, x: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Create a new flattened input that requires grad, computes its image according to net, and then return
     both input and output (flattened version). Serves as entrypoint to the power iter method.
@@ -91,6 +101,8 @@ def transform_contraint(func: Callable) -> Callable:
         def two_net_minus_identity(x: torch.Tensor) -> torch.Tensor:
             return 2 * net(x) - x
 
-        return func(two_net_minus_identity, x, EPS, alpha, max_iters, power_iter_tol, is_eval)
+        return func(
+            two_net_minus_identity, x, EPS, alpha, max_iters, power_iter_tol, is_eval
+        )
 
     return wrapper

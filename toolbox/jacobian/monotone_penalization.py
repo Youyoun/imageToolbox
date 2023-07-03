@@ -66,7 +66,7 @@ class MonotonyRegularization(nn.Module):
         :param x: Input data
         :return: Penalization value and lambda min
         """
-        all_ev = get_neuralnet_jacobian_ev(net, x)
+        all_ev = get_neuralnet_jacobian_ev(net, x, self.is_eval)
         if self.is_eval:
             all_ev.detach_()
         return (
