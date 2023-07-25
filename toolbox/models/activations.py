@@ -13,6 +13,12 @@ class Activation(StrEnum):
     ReLU = enum.auto()
     Identity = enum.auto()
     Softplus = enum.auto()
+    TanhShifted = enum.auto()
+
+
+class TanhShifted(nn.Tanh):
+    def forward(self, input_):
+        return (super().forward(2 * input_ - 1) + 1) / 2
 
 
 def _convert_str_type_to_activation(str_: str) -> Activation:
@@ -25,4 +31,6 @@ def _convert_str_type_to_activation(str_: str) -> Activation:
 def get_activation(activ_type: Union[Activation, str]) -> nn.Module:
     if type(activ_type) == str:
         activ_type = _convert_str_type_to_activation(activ_type.lower())
+    if activ_type.name == "TanhShifted":
+        return TanhShifted()
     return getattr(nn, activ_type.name)()
