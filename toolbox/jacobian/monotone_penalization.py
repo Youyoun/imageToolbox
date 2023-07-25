@@ -6,7 +6,12 @@ import torch.nn as nn
 
 from ..utils import StrEnum, get_module_logger
 from .jacobian import alpha_operator, sum_J_JT
-from .power_iteration import power_method
+from .power_iteration import (
+    conjugate_gradient_smallest_ev,
+    lanczos,
+    lobpcg,
+    power_method,
+)
 
 logger = get_module_logger(__name__)
 
@@ -18,6 +23,9 @@ class PenalizationMethods(StrEnum):
     EVDECOMP = enum.auto()
     OPTPOWER = enum.auto()
     OPTPOWERNOALPHA = enum.auto()
+    CG = enum.auto()  # Conjugate gradient method for eigenvalues
+    LOBPCG = enum.auto()
+    LANCZOS = enum.auto()
 
 
 def penalization(lambda_min, eps, use_relu=True):
@@ -48,13 +56,12 @@ class MonotonyRegularization(nn.Module):
         self.is_eval = eval_mode
         self.power_iter_tol = power_iter_tol
         self.use_relu = use_relu_penalization
+        self.iterates = None
         logger.debug(
             f"Using {self.method.name} for computing regularisation. Tolerance for PI: {self.power_iter_tol}"
         )
 
-    def forward(
-        self, model: Callable, x: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         return self._monotonicity_penalization(model, x)
 
     def _penalization_fulljacobian(
@@ -66,6 +73,7 @@ class MonotonyRegularization(nn.Module):
         :param x: Input data
         :return: Penalization value and lambda min
         """
+        assert x.shape[0] == 1, "Batch size must be 1 for full jacobian"
         all_ev = get_neuralnet_jacobian_ev(net, x, self.is_eval)
         if self.is_eval:
             all_ev.detach_()
@@ -90,13 +98,15 @@ class MonotonyRegularization(nn.Module):
         def operator(u):
             return alpha_operator(x_new, y_new, u, self.alpha, self.is_eval)
 
-        lambda_min = self.alpha - power_method(
+        _, lambda_min, self.iterates = power_method(
             x_new,
             operator,
             self.max_iters,
             tol=self.power_iter_tol,
-            is_eval=self.is_eval,
+            save_iterates=True,
         )
+        self.iterates = [self.alpha - ev for ev in self.iterates]
+        lambda_min = self.alpha - lambda_min
         return (
             penalization(lambda_min, self.eps, self.use_relu),
             lambda_min.min().detach(),
@@ -120,17 +130,15 @@ class MonotonyRegularization(nn.Module):
             return alpha_operator(x_new, y_new, u, self.alpha, self.is_eval)
 
         with torch.no_grad():
-            vectors, _ = power_method(
+            vectors, _, self.iterates = power_method(
                 x_new,
                 operator,
                 self.max_iters,
                 tol=self.power_iter_tol,
-                is_eval=True,
-                return_vector=True,
+                save_iterates=True,
             )
-        vtOv = torch.sum(
-            (vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1
-        )
+            self.iterates = [self.alpha - ev for ev in self.iterates]
+        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
         vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
@@ -159,18 +167,13 @@ class MonotonyRegularization(nn.Module):
             return sum_J_JT(x_new, y_new, u, self.is_eval)
 
         with torch.no_grad():
-            lambda_max = (
-                power_method(
-                    x_new,
-                    operator,
-                    self.max_iters,
-                    tol=self.power_iter_tol,
-                    is_eval=True,
-                )
-                .abs()
-                .max()
-                .item()
+            _, lambda_max, _ = power_method(
+                x_new,
+                operator,
+                self.max_iters,
+                tol=self.power_iter_tol,
             )
+            lambda_max = lambda_max.abs().max().item()
         logger.debug(f"Lambda max = {lambda_max}")
         if lambda_max < 0:
             logger.warning(
@@ -184,6 +187,122 @@ class MonotonyRegularization(nn.Module):
         output = self._penalization_optpowermethod(net, x)
         self.alpha = old_alpha
         return output
+
+    def _penalization_cg(
+        self, net: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        x_new = x.clone()
+        x_new.requires_grad_()
+        y_new = net(x_new)
+
+        def operator(u):
+            return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+        with torch.no_grad():
+            vectors, _, self.iterates = conjugate_gradient_smallest_ev(
+                x_new,
+                operator,
+                max_iter=self.max_iters,
+                tol=self.power_iter_tol,
+                save_iterates=True,
+            )
+
+        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
+        vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
+        rayleigh_coeff = vtOv / vtv
+
+        lambda_min = rayleigh_coeff.min()
+        return (
+            penalization(lambda_min, self.eps, self.use_relu),
+            lambda_min.min().detach(),
+        )
+
+    def _penalization_lobpcg(
+        self, net: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # We will perform the Lanczos algorithm to compute the lowest eigenvalue on each element of the batch.
+
+        vectors = torch.zeros_like(x)
+        self.iterates = []
+        for idx in range(x.shape[0]):
+            x_new = x[idx : idx + 1].clone()
+            x_new.requires_grad_()
+            y_new = net(x_new)
+
+            def operator(u):
+                return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+            with torch.no_grad():
+                v, _, iterates = lobpcg(
+                    x_new,
+                    operator,
+                    max_iter=self.max_iters,
+                    tol=self.power_iter_tol,
+                    save_iterates=True,
+                )
+                self.iterates.append(iterates)
+            vectors[idx] = v.squeeze(0)
+            print(_)
+
+        x_new = x.clone()
+        x_new.requires_grad_()
+        y_new = net(x_new)
+
+        def operator(u):
+            return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+        vtOv = torch.sum((vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1)
+        vtv = torch.sum((vectors * vectors).reshape(vectors.shape[0], -1), dim=1)
+        rayleigh_coeff = vtOv / vtv
+
+        lambda_min = rayleigh_coeff.min()
+        return (
+            penalization(lambda_min, self.eps, self.use_relu),
+            lambda_min.min().detach(),
+        )
+
+    def _penalization_lanczos(
+        self, net: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # We will perform the Lanczos algorithm to compute the lowest eigenvalue on each element of the batch.
+
+        vectors = torch.zeros_like(x)
+        self.iterates = []
+        for idx in range(x.shape[0]):
+            x_new = x[idx : idx + 1].clone()
+            x_new.requires_grad_()
+            y_new = net(x_new)
+
+            def operator(u):
+                return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+            with torch.no_grad():
+                v, _, iterates = lanczos(
+                    x_new,
+                    operator,
+                    max_iter=self.max_iters,
+                    tol=self.power_iter_tol,
+                    save_iterates=True,
+                )
+                self.iterates.append(iterates)
+            vectors[idx] = v.squeeze(0)
+
+        x_new = x.clone()
+        x_new.requires_grad_()
+        y_new = net(x_new)
+
+        def operator(u):
+            return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+        vtOv = torch.sum((vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1)
+        vtv = torch.sum((vectors * vectors).reshape(vectors.shape[0], -1), dim=1)
+        rayleigh_coeff = vtOv / vtv
+
+        lambda_min = rayleigh_coeff.min()
+        return (
+            penalization(lambda_min, self.eps, self.use_relu),
+            lambda_min.min().detach(),
+        )
 
     def _monotonicity_penalization(
         self, net: Callable, x: torch.Tensor
@@ -201,6 +320,12 @@ class MonotonyRegularization(nn.Module):
             return self._penalization_optpowermethod(net, x)
         elif self.method == PenalizationMethods.OPTPOWERNOALPHA:
             return self._penalization_optpowermethod_noalpha(net, x)
+        elif self.method == PenalizationMethods.CG:
+            return self._penalization_cg(net, x)
+        elif self.method == PenalizationMethods.LOBPCG:
+            return self._penalization_lobpcg(net, x)
+        elif self.method == PenalizationMethods.LANCZOS:
+            return self._penalization_lanczos(net, x)
         else:
             raise ValueError(f"No such penalization method {self.method}")
 
@@ -233,9 +358,5 @@ class MonotonyRegularizationShift(MonotonyRegularization):
 
         return two_net_minus_identity
 
-    def forward(
-        self, model: Callable, x: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self._monotonicity_penalization(
-            MonotonyRegularizationShift.shift_model(model), x
-        )
+    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        return self._monotonicity_penalization(MonotonyRegularizationShift.shift_model(model), x)

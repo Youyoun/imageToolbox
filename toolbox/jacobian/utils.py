@@ -59,14 +59,10 @@ def get_lambda_min_or_max_poweriter(
     y_pred = model(x_detached.view(x.shape)).flatten(start_dim=1)
     if not biggest:
         A_dot_u = lambda u: alpha_operator(x_detached, y_pred, u, alpha, is_eval)
-        return alpha - power_method(
-            x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval
-        )
+        return alpha - power_method(x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL)[1]
     else:
         A_dot_u = lambda u: sum_J_JT(x_detached, y_pred, u, is_eval)
-        return power_method(
-            x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL, is_eval=is_eval
-        )
+        return power_method(x_detached, A_dot_u, n_iter, tol=POWER_ITER_TOL)[1]
 
 
 def generate_new_prediction(
