@@ -6,6 +6,7 @@ from .compute_metrics import (
     compute_relative_difference,
     mean_absolute_error,
     mean_squared_error,
+    pieapp,
 )
 from .metrics import (
     AverageMetricsDictionary,
