@@ -23,7 +23,12 @@ from toolbox.jacobian import (
     power_method,
     sum_J_JT,
 )
-from toolbox.models import get_model, RUnet
+from toolbox.jacobian.power_iteration import (
+    conjugate_gradient_smallest_ev,
+    lanczos,
+    lobpcg,
+)
+from toolbox.models import RUnet, get_model
 
 PERCENT_CLOSE = 0.9
 NDIM = 50
@@ -72,9 +77,7 @@ class TestJacobienVectorProduct:
         jTu = JTu(x, f(x), u, True)
 
         with torch.no_grad():
-            assert torch.isclose(
-                jTu, torch.matmul(W.transpose(1, 2), u), rtol=FLOAT_TOL
-            ).all()
+            assert torch.isclose(jTu, torch.matmul(W.transpose(1, 2), u), rtol=FLOAT_TOL).all()
 
     @staticmethod
     @pytest.mark.parametrize("execution_number", range(50))
@@ -146,9 +149,7 @@ class TestJacobianOperator:
             truth = alpha * u - 1 / 2 * torch.matmul(W + W.transpose(1, 2), u)
 
         is_close = torch.isclose(op, truth, rtol=FLOAT_TOL, atol=FLOAT_TOL)
-        assert is_close.sum() >= NDIM * BATCH_SIZE * 0.95, (
-            op[~is_close] - truth[~is_close]
-        )
+        assert is_close.sum() >= NDIM * BATCH_SIZE * 0.95, op[~is_close] - truth[~is_close]
 
     @staticmethod
     def test_sum_j_jt():
@@ -163,15 +164,12 @@ class TestJacobianOperator:
             truth = 1 / 2 * torch.matmul(W + W.transpose(1, 2), u)
 
         is_close = torch.isclose(op, truth, rtol=FLOAT_TOL)
-        assert is_close.sum() >= NDIM * BATCH_SIZE * 0.95, (
-            op[~is_close] - truth[~is_close]
-        )
+        assert is_close.sum() >= NDIM * BATCH_SIZE * 0.95, op[~is_close] - truth[~is_close]
 
     @staticmethod
-    @pytest.mark.parametrize(
-        ["channels", "kernel_size"], [[1, 3], [1, 5], [3, 3], [3, 5]]
-    )
+    @pytest.mark.parametrize(["channels", "kernel_size"], [[1, 3], [1, 5], [3, 3], [3, 5]])
     def test_compute_jacobian_size(channels, kernel_size):
+        BATCH_SIZE = 10
         x = torch.randn((BATCH_SIZE, channels, NDIM, NDIM), requires_grad=True)
         kernel = torch.randn((channels, channels, kernel_size, kernel_size))
         f = lambda x: F.conv2d(x, kernel, stride=1, padding=kernel_size // 2)
@@ -208,9 +206,39 @@ class TestEVComputation:
         w = torch.diag(torch.randn(NDIM))
         W = w.unsqueeze(0)
         operator = lambda x: torch.matmul(W, x.unsqueeze(-1)).squeeze()
-        lambda_max = power_method(x, operator, max_iter=1000, tol=1e-6, is_eval=True)
+        lambda_max = power_method(x, operator, max_iter=1000, tol=1e-6)[1]
         true_lambda_max = w.flatten()[torch.abs(w).argmax()]
         assert are_equal(lambda_max, true_lambda_max), lambda_max - true_lambda_max
+
+    @staticmethod
+    def test_cg():
+        x = torch.randn((BATCH_SIZE, NDIM), requires_grad=True)
+        w = torch.diag(torch.randn(NDIM))
+        W = w.unsqueeze(0)
+        operator = lambda x: torch.matmul(W, x.unsqueeze(-1)).squeeze()
+        lambda_min = conjugate_gradient_smallest_ev(x, operator, max_iter=1000, tol=1e-8)[1]
+        true_lambda_min = w.min().item()
+        assert are_equal(lambda_min, true_lambda_min), (lambda_min - true_lambda_min).max()
+
+    @staticmethod
+    def test_lobpcg():
+        x = torch.randn((BATCH_SIZE, NDIM), requires_grad=True)
+        w = torch.diag(torch.randn(NDIM))
+        W = w.unsqueeze(0)
+        operator = lambda x: torch.matmul(W, x.unsqueeze(-1)).squeeze()
+        lambda_min = lobpcg(x, operator, max_iter=1000, tol=1e-8)[1]
+        true_lambda_min = w.min().item()
+        assert are_equal(lambda_min, true_lambda_min), (lambda_min - true_lambda_min).max()
+
+    @staticmethod
+    def test_lanczos():
+        x = torch.randn((BATCH_SIZE, NDIM), requires_grad=True)
+        w = torch.diag(torch.randn(NDIM))
+        W = w.unsqueeze(0)
+        operator = lambda x: torch.matmul(W, x.unsqueeze(-1)).squeeze()
+        lambda_min = lanczos(x, operator, max_iter=1000, tol=1e-8)[1]
+        true_lambda_min = w.min().item()
+        assert are_equal(lambda_min, true_lambda_min), (lambda_min - true_lambda_min).max()
 
     @staticmethod
     def test_get_jacobian_ev():
@@ -235,7 +263,7 @@ class TestEVComputation:
     @staticmethod
     @pytest.mark.parametrize("alpha", [0.0, 1.0, 2.0, 5.0])
     def test_get_lambda_max_min(alpha: float):
-        _niter = 1000
+        _niter = 1500
 
         x = torch.randn((BATCH_SIZE, NDIM, 1), requires_grad=True)
         w = torch.diag(torch.randn(NDIM))
@@ -252,13 +280,9 @@ class TestEVComputation:
         true_lambda_min = w.min()
         abs_lambda_max = w.flatten()[torch.abs(w).argmax()]
         if alpha > (true_lambda_max + true_lambda_min) / 2:
-            assert are_equal(
-                ev_min, true_lambda_min
-            ), f"{(true_lambda_min - ev_min).abs().max()}"
+            assert are_equal(ev_min, true_lambda_min), f"{(true_lambda_min - ev_min).abs().max()}"
         else:
-            assert are_equal(
-                ev_min, true_lambda_max
-            ), f"{(true_lambda_max - ev_min).max()}"
+            assert are_equal(ev_min, true_lambda_max), f"{(true_lambda_max - ev_min).max()}"
         assert are_equal(
             ev_largest_abs, abs_lambda_max
         ), f"{(abs_lambda_max - ev_largest_abs).abs().max()}"
@@ -409,9 +433,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
         operator = lambda x: torch.matmul(W, x)
         lambda_max = power_method(x, operator, max_iter=1000, tol=1e-6, is_eval=True)
         true_lambda_max = w.flatten()[torch.abs(w).argmax()]
-        assert are_equal(lambda_max, true_lambda_max), (
-            lambda_max - true_lambda_max
-        ).mean()
+        assert are_equal(lambda_max, true_lambda_max), (lambda_max - true_lambda_max).mean()
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
@@ -519,9 +541,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
-    def test_penalization_optpowermethod_random_symmetric_relu(
-        alpha: float, eps: float
-    ):
+    def test_penalization_optpowermethod_random_symmetric_relu(alpha: float, eps: float):
         NDIM = 10
         _niter = 500
 
@@ -635,9 +655,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
-    def test_penalization_powermethod_optpowermethod_grads_percentclose(
-        alpha: float, eps: float
-    ):
+    def test_penalization_powermethod_optpowermethod_grads_percentclose(alpha: float, eps: float):
         _niter = 2000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -675,9 +693,7 @@ class TestOptimizedPenalizationPowerMethodReLU:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
-    def test_penalization_powermethod_optpowermethod_grads_relu(
-        alpha: float, eps: float
-    ):
+    def test_penalization_powermethod_optpowermethod_grads_relu(alpha: float, eps: float):
         _niter = 1000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -834,9 +850,7 @@ class TestOptimizedNoAlphaPenalizationPowerMethodReLU:
 
     @staticmethod
     @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHAS, EPS))
-    def test_penalization_powermethod_optpowermethod_noalpha_grads(
-        alpha: float, eps: float
-    ):
+    def test_penalization_powermethod_optpowermethod_noalpha_grads(alpha: float, eps: float):
         _niter = 2000
 
         x = torch.randn((BATCH_SIZE, NDIM, NDIM))
@@ -944,10 +958,7 @@ class TestMonotonyLearningReLUPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
     @staticmethod
@@ -976,10 +987,7 @@ class TestMonotonyLearningReLUPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
     @staticmethod
@@ -1005,10 +1013,7 @@ class TestMonotonyLearningReLUPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
 
@@ -1043,10 +1048,7 @@ class TestMonotonyLearningPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
     @staticmethod
@@ -1074,10 +1076,7 @@ class TestMonotonyLearningPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
     @staticmethod
@@ -1093,6 +1092,34 @@ class TestMonotonyLearningPen:
             x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearningPen.DEVICE)
             pen, evs = MonotonyRegularization(
                 method=PenalizationMethods.EVDECOMP, eps=eps, eval_mode=False
+            )(model, x[:1])
+            optim.zero_grad()
+            pen.backward()
+            optim.step()
+            if evs.min() >= eps:
+                break
+        assert (
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
+        )
+
+    @staticmethod
+    @pytest.mark.parametrize(["alpha", "eps"], itertools.product(ALPHA, EPS))
+    def test_learning_monotony_pmcg(alpha: float, eps: float):
+        _niter = 200
+        _max_iter = 500
+
+        model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearningPen.DEVICE)
+        optim = torch.optim.Adam(model.parameters(), lr=0.01)
+        optim.zero_grad()
+
+        for _ in range(_max_iter):
+            x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearningPen.DEVICE)
+            pen, evs = MonotonyRegularization(
+                method=PenalizationMethods.CG,
+                alpha=alpha,
+                eps=eps,
+                eval_mode=False,
+                max_iter=_niter,
             )(model, x)
             optim.zero_grad()
             pen.backward()
@@ -1100,10 +1127,29 @@ class TestMonotonyLearningPen:
             if evs.min() >= eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
+        )
+
+    @staticmethod
+    def test_learning_monotony_lanczos():
+        _max_iter = 50
+
+        model = nn.Linear(NDIM, NDIM, bias=True).to(TestMonotonyLearningPen.DEVICE)
+        optim = torch.optim.Adam(model.parameters(), lr=0.01)
+        optim.zero_grad()
+
+        for _ in range(_max_iter):
+            x = torch.randn((BATCH_SIZE, NDIM)).to(TestMonotonyLearningPen.DEVICE)
+            pen, evs = MonotonyRegularization(
+                method=PenalizationMethods.LANCZOS, eps=0.05, eval_mode=False
+            )(model, x[:1])
+            optim.zero_grad()
+            pen.backward()
+            optim.step()
+            if evs.min() >= 0.05:
+                break
+        assert (
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
 
@@ -1124,10 +1170,8 @@ class TestConstraintValuesWithTransformedConstraint:
             ],
         ),
     )
-    def test_values_equality_relu(
-        alpha: float, eps: float, method: PenalizationMethods
-    ):
-        _niter = 200
+    def test_values_equality_relu(alpha: float, eps: float, method: PenalizationMethods):
+        _niter = 1000
         BATCH_SIZE = 1
         NDIM = 30
 
@@ -1146,6 +1190,7 @@ class TestConstraintValuesWithTransformedConstraint:
             eval_mode=True,
             max_iter=_niter,
             use_relu_penalization=True,
+            power_iter_tol=1e-6,
         )
         method_2 = MonotonyRegularization(
             method=method,
@@ -1154,18 +1199,16 @@ class TestConstraintValuesWithTransformedConstraint:
             eval_mode=True,
             max_iter=_niter,
             use_relu_penalization=True,
+            power_iter_tol=1e-6,
         )
         pen1, ev_min1 = method_2(f2, x)
         pen2, ev_min2 = method_(f, x)
+        pen_ = max(0, (-1 + eps - real_evs2[0])) ** 2
         # The square complicates some stuff, so the precision is lowered for the square
         assert torch.isclose(pen1, pen2, atol=FLOAT_TOL * 10, rtol=0.0).all()
         assert torch.isclose(ev_min1, ev_min2, atol=FLOAT_TOL, rtol=0.0).all()
-        assert torch.isclose(
-            real_evs1[0], (ev_min2 + 1) / 2, atol=FLOAT_TOL, rtol=0.0
-        ).all()
-        assert torch.isclose(
-            max(0, (-1 + eps - real_evs2[0])) ** 2, pen1, atol=FLOAT_TOL * 10, rtol=0.0
-        ).all()
+        assert torch.isclose(real_evs1[0], (ev_min2 + 1) / 2, atol=FLOAT_TOL, rtol=0.0).all()
+        assert torch.isclose(pen_, pen1, atol=FLOAT_TOL * 10, rtol=0.0).all()
 
     @staticmethod
     @pytest.mark.parametrize(
@@ -1203,9 +1246,7 @@ class TestConstraintValuesWithTransformedConstraint:
         pen2, ev_min2 = method_(f, x)
         assert torch.isclose(pen1, pen2, atol=FLOAT_TOL, rtol=0.0).all()
         assert torch.isclose(ev_min1, ev_min2, atol=FLOAT_TOL, rtol=0.0).all()
-        assert torch.isclose(
-            real_evs1[0], (ev_min2 + 1) / 2, atol=FLOAT_TOL, rtol=0.0
-        ).all()
+        assert torch.isclose(real_evs1[0], (ev_min2 + 1) / 2, atol=FLOAT_TOL, rtol=0.0).all()
         assert torch.isclose(
             torch.maximum(torch.ones(1) - eps, -real_evs2[0]),
             pen1,
@@ -1232,9 +1273,7 @@ class TestMonotonyLearningWithTransformedConstraint:
             ],
         ),
     )
-    def test_learning_monotony_power(
-        alpha: float, eps: float, method: PenalizationMethods
-    ):
+    def test_learning_monotony_power(alpha: float, eps: float, method: PenalizationMethods):
         _niter = 100
         _max_iter = 200
 
@@ -1243,9 +1282,7 @@ class TestMonotonyLearningWithTransformedConstraint:
         )
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         optim.zero_grad()
-        pmethod = MonotonyRegularizationShift(
-            method=method, alpha=alpha, eps=eps, max_iter=_niter
-        )
+        pmethod = MonotonyRegularizationShift(method=method, alpha=alpha, eps=eps, max_iter=_niter)
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, NDIM)).to(
                 TestMonotonyLearningWithTransformedConstraint.DEVICE
@@ -1257,10 +1294,7 @@ class TestMonotonyLearningWithTransformedConstraint:
             if evs.min() >= -1 + eps:
                 break
         assert (
-            torch.linalg.eigvalsh(
-                1 / 2 * (model.weight + model.weight.T).detach().cpu()
-            )[0]
-            >= 0.0
+            torch.linalg.eigvalsh(1 / 2 * (model.weight + model.weight.T).detach().cpu())[0] >= 0.0
         )
 
 
@@ -1276,13 +1310,11 @@ class TestModelOnRegularization:
             ALPHA,
             EPS,
             [
-                PenalizationMethods.OPTPOWER,
+                PenalizationMethods.OPTPOWERNOALPHA,
             ],
         ),
     )
-    def test_learning_monotony_power_dncnn(
-        alpha: float, eps: float, method: PenalizationMethods
-    ):
+    def test_learning_monotony_power_dncnn(alpha: float, eps: float, method: PenalizationMethods):
         _niter = 100
         _max_iter = 200
 
@@ -1291,9 +1323,7 @@ class TestModelOnRegularization:
         )
         optim = torch.optim.Adam(model.parameters(), lr=0.01)
         optim.zero_grad()
-        pmethod = MonotonyRegularizationShift(
-            method=method, alpha=alpha, eps=eps, max_iter=_niter
-        )
+        pmethod = MonotonyRegularizationShift(method=method, alpha=alpha, eps=eps, max_iter=_niter)
         for _ in range(_max_iter):
             x = torch.randn((BATCH_SIZE, 1, NDIM, NDIM)).to(
                 TestMonotonyLearningWithTransformedConstraint.DEVICE
