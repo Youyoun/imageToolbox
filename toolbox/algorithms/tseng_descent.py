@@ -22,6 +22,7 @@ from ..metrics import (
     MetricsDictionary,
     compute_relative_difference,
     mean_absolute_error,
+    pieapp,
 )
 from ..utils import get_module_logger
 from .proj_op import Identity
@@ -93,8 +94,11 @@ class TsengDescent(BasicSolver):
         self.n_iter = 0
         self.monotony_fn = None
         if self.n_test_monotony > 0:
-            self.monotony_fn = MonotonyRegularization(
-                PenalizationMethods.OPTPOWERNOALPHA, 0.0, 0.0, 500, eval_mode=True
+            self.monotony_fn_pm = MonotonyRegularization(
+                PenalizationMethods.LANCZOS, 0.0, 0.0, 500, eval_mode=True
+            )
+            self.monotony_fn_jacobian = MonotonyRegularization(
+                PenalizationMethods.EVDECOMP, 0.0, 0.0, 0, eval_mode=True
             )
 
         self.metrics = None
@@ -132,6 +136,7 @@ class TsengDescent(BasicSolver):
         if real_x is not None:
             metrics_dict["||x_{k+1} - x||_1"] = mean_absolute_error(xk, real_x)
             metrics_dict["PSNR"] = PSNR(real_x, xk)
+            # metrics_dict["PieAPP"] = pieapp(real_x, xk)
 
         metrics_dict["SNR"] = SNR(xk)
         return metrics_dict
@@ -169,6 +174,13 @@ class TsengDescent(BasicSolver):
             )
 
         images = []
+        if self.n_test_monotony > 0:
+            if real_x.nelement() <= 3 * 32 * 32:
+                logger.info("Using Jacobian for monotony test.")
+                self.monotony_fn = self.monotony_fn_jacobian
+            else:
+                logger.info("Using Power method for monotony test.")
+                self.monotony_fn = self.monotony_fn_pm
 
         if self.random_init:
             y = torch.randn_like(input_vector).to(self.device) * 1e-3
@@ -183,15 +195,11 @@ class TsengDescent(BasicSolver):
             # Update (one step)
             ak = self.operator.grad(xk, y=y)
             zk = self.indicator.prox(xk - gamma * ak, float("nan"))
-            xk = self.indicator.prox(
-                zk - gamma * (self.operator.grad(zk, y=y) - ak), float("nan")
-            )
+            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=y) - ak), float("nan"))
 
             if save_gif_path is not None:
                 im = torchvision.transforms.ToPILImage()(xk.cpu().squeeze(0))
-                ImageDraw.Draw(im).text(
-                    (10, 10), f"Step {step}", fill=(255, 255, 255, 128)
-                )
+                ImageDraw.Draw(im).text((10, 10), f"Step {step}", fill=(255, 255, 255, 128))
                 images.append(im)
 
             # Compute metrics
@@ -206,9 +214,7 @@ class TsengDescent(BasicSolver):
             if self.monotony_fn is not None and step % self.n_test_monotony == 0:
                 logger.debug(f"Testing monotony at step {step}")
                 logger.debug("Testing monotony for operator...")
-                _, l_min_op = self.monotony_fn(
-                    lambda x: self.operator.grad(x, y), xk.detach()
-                )
+                _, l_min_op = self.monotony_fn(lambda x: self.operator.grad(x, y), xk.detach())
                 logger.debug("Testing monotony for regularization...")
                 _, l_min_reg = self.monotony_fn(self.operator.reg.grad, xk.detach())
                 self.metrics.add(
