@@ -18,7 +18,9 @@ from toolbox.imageOperators import (
 
 
 class TestImageGradient:
-    SPECIFIC_X = torch.Tensor([[[2, 6, 2, 1], [4, 7, 1, 9], [5, 2, 0, 1], [2, 5, 6, 6]]])
+    SPECIFIC_X = torch.Tensor(
+        [[[2, 6, 2, 1], [4, 7, 1, 9], [5, 2, 0, 1], [2, 5, 6, 6]]]
+    )
     SPECIFIC_X_GRAD_Y = torch.Tensor(
         [[[4, -4, -1, 0], [3, -6, 8, 0], [-3, -2, 1, 0], [3, 1, 0, 0]]]
     )
@@ -114,7 +116,9 @@ class TestBlurOperatorsConstantPadding:
             std
             * math.sqrt(2 * math.pi)
             * torch.from_numpy(
-                gaussian(x.numpy(), sigma=std, mode="constant", cval=0, preserve_range=True)
+                gaussian(
+                    x.numpy(), sigma=std, mode="constant", cval=0, preserve_range=True
+                )
             )
         )
         assert are_equal(np_blur, blurred), (np_blur - blurred).abs().max()
@@ -132,11 +136,19 @@ class TestBlurOperatorsConstantPadding:
                 std
                 * math.sqrt(2 * math.pi)
                 * torch.from_numpy(
-                    gaussian(x[i].numpy(), sigma=std, mode="constant", cval=0, preserve_range=True)
+                    gaussian(
+                        x[i].numpy(),
+                        sigma=std,
+                        mode="constant",
+                        cval=0,
+                        preserve_range=True,
+                    )
                 )
             )
             assert are_equal(np_blur, blurred[i]), (np_blur - blurred[i]).abs().max()
-            assert are_equal(np_blur, blurred_t[i]), (np_blur - blurred_t[i]).abs().max()
+            assert are_equal(np_blur, blurred_t[i]), (
+                (np_blur - blurred_t[i]).abs().max()
+            )
         assert blurred.ndim == 4
 
     @staticmethod
@@ -170,15 +182,40 @@ class TestBlurOperatorsConstantPadding:
 
     @staticmethod
     @pytest.mark.parametrize("kernel", Kernels)
-    def test_conjugate_property(kernel: Kernels):
-        blurr = BlurConvolution(31, kernel, 3.0)
+    def test_conjugate_property_conv(kernel: Kernels):
+        blurr = BlurConvolution(
+            31, kernel, 3.0, frequency=3 if kernel == Kernels.GABOR else None
+        )
         blurr.PAD_MODE = "constant"
         u1 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
         u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
         Au1 = blurr @ u1
         Atu2 = blurr.T @ u2
-        z1 = torch.matmul(u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1))
-        z2 = torch.matmul(Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1))
+        z1 = torch.matmul(
+            u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1)
+        )
+        z2 = torch.matmul(
+            Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1)
+        )
+        assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
+
+    @staticmethod
+    @pytest.mark.parametrize("kernel", Kernels)
+    def test_conjugate_property_fft(kernel: Kernels):
+        blurr = GaussianBlurFFT(
+            31, kernel, 3.0, frequency=3 if kernel == Kernels.GABOR else None
+        )
+        blurr.PAD_MODE = "constant"
+        u1 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        Au1 = blurr @ u1
+        Atu2 = blurr.T @ u2
+        z1 = torch.matmul(
+            u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1)
+        )
+        z2 = torch.matmul(
+            Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1)
+        )
         assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
 
 
@@ -196,11 +233,19 @@ class TestBlurOperatorsReplicatePadding:
                 std
                 * math.sqrt(2 * math.pi)
                 * torch.from_numpy(
-                    gaussian(x[i].numpy(), sigma=std, mode="nearest", cval=0, preserve_range=True)
+                    gaussian(
+                        x[i].numpy(),
+                        sigma=std,
+                        mode="nearest",
+                        cval=0,
+                        preserve_range=True,
+                    )
                 )
             )
             assert are_equal(np_blur, blurred[i]), (np_blur - blurred[i]).abs().max()
-            assert are_equal(np_blur, blurred_t[i]), (np_blur - blurred_t[i]).abs().max()
+            assert are_equal(np_blur, blurred_t[i]), (
+                (np_blur - blurred_t[i]).abs().max()
+            )
         assert blurred.ndim == 4
 
     @staticmethod
@@ -229,8 +274,31 @@ class TestBlurOperatorsReplicatePadding:
         u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
         Au1 = blurr @ u1
         Atu2 = blurr.T @ u2
-        z1 = torch.matmul(u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1))
-        z2 = torch.matmul(Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1))
+        z1 = torch.matmul(
+            u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1)
+        )
+        z2 = torch.matmul(
+            Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1)
+        )
+        assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
+
+    @staticmethod
+    @pytest.mark.parametrize("kernel", Kernels)
+    def test_conjugate_property_fft(kernel: Kernels):
+        blurr = GaussianBlurFFT(
+            31, kernel, 3.0, frequency=3 if kernel == Kernels.GABOR else None
+        )
+        blurr.PAD_MODE = "replicate"
+        u1 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        u2 = torch.randn(BATCH_SIZE, 1, NDIM_X, NDIM_Y)
+        Au1 = blurr @ u1
+        Atu2 = blurr.T @ u2
+        z1 = torch.matmul(
+            u2.reshape(u2.shape[0], 1, -1), Au1.reshape(u2.shape[0], -1, 1)
+        )
+        z2 = torch.matmul(
+            Atu2.reshape(u2.shape[0], 1, -1), u1.reshape(u2.shape[0], -1, 1)
+        )
         assert (z1 - z2).max() < 2e-3, (z1 - z2).abs().max()
 
     @staticmethod
@@ -245,5 +313,9 @@ class TestBlurOperatorsReplicatePadding:
         for i in range(BATCH_SIZE):
             solo_blur = blurr @ x[i]
             solo_blur_t = blurr.T @ x[i]
-            assert are_equal(solo_blur, blurred[i]), (solo_blur - blurred[i]).abs().max()
-            assert are_equal(solo_blur_t, blurred_t[i]), (solo_blur_t - blurred_t[i]).abs().max()
+            assert are_equal(solo_blur, blurred[i]), (
+                (solo_blur - blurred[i]).abs().max()
+            )
+            assert are_equal(solo_blur_t, blurred_t[i]), (
+                (solo_blur_t - blurred_t[i]).abs().max()
+            )
