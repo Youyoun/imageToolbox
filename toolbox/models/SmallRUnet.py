@@ -56,7 +56,7 @@ class ResidualConv(nn.Module):
         return self.conv_block(x) + self.conv_skip(x)
 
 
-class RUnet(nn.Module):
+class RUnet4Layers(nn.Module):
     def __init__(
         self,
         channels: int = 1,
@@ -120,3 +120,79 @@ class RUnet(nn.Module):
         x7 = self.residual_up3(x7)
 
         return self.output_layer(x7).view(init_shape)
+
+
+class RUnet(nn.Module):
+    def __init__(
+        self,
+        channels: int = 1,
+        filters: list = [32, 64, 128, 256],
+        use_batchnorm: bool = False,
+        mid_activations: Activation = Activation.ReLU,
+        last_activation: Activation = Activation.Tanh,
+    ):
+        super().__init__()
+        self.channels = channels
+        self.filters = filters
+        self.use_batchnorm = use_batchnorm
+        self.depth = len(filters)
+
+        self.input_layer = get_input_layer(
+            channels, filters[0], use_batchnorm, activation=mid_activations
+        )
+        self.input_skip = nn.Conv2d(channels, filters[0], 3, padding=1)
+
+        self.residual_down = nn.ModuleList(
+            [
+                ResidualConv(
+                    filters[i], filters[i + 1], 2, 1, activation=mid_activations
+                )
+                for i in range(self.depth - 2)
+            ]
+        )
+
+        self.bridge = ResidualConv(
+            filters[-2], filters[-1], 2, 1, activation=mid_activations
+        )
+
+        self.upsample = nn.ModuleList(
+            [
+                nn.ConvTranspose2d(filters[i + 1], filters[i + 1], 2, 2)
+                for i in range(self.depth - 2, -1, -1)
+            ]
+        )
+
+        self.residual_up = nn.ModuleList(
+            [
+                ResidualConv(
+                    filters[i] + filters[i + 1],
+                    filters[i],
+                    1,
+                    1,
+                    activation=mid_activations,
+                )
+                for i in range(self.depth - 2, -1, -1)
+            ]
+        )
+
+        self.output_layer = nn.Sequential(
+            nn.Conv2d(filters[0], channels, 1, 1), get_activation(last_activation)
+        )
+
+    def forward(self, x):
+        x, init_shape = to_4D(x)
+        x1 = self.input_layer(x) + self.input_skip(x)
+        x_down = [x1]
+        for i in range(self.depth - 2):
+            x_down.append(self.residual_down[i](x_down[-1]))
+        x_bridge = self.bridge(x_down[-1])
+        x_up = [x_bridge]
+        for i in range(self.depth - 1):
+            x_up.append(
+                self.residual_up[i](
+                    torch.cat(
+                        [self.upsample[i](x_up[-1]), x_down[self.depth - 2 - i]], dim=1
+                    )
+                )
+            )
+        return self.output_layer(x_up[-1]).view(init_shape)
