@@ -169,13 +169,13 @@ class TsengDescent(BasicSolver):
                 sigma=self.gamma,
                 gamma_min=1e-6,
                 reset_each_search=True,
-                theta=0.9,
+                theta=0.1,
                 beta=0.5,
             )
 
         images = []
         if self.n_test_monotony > 0:
-            if real_x.nelement() <= 3 * 32 * 32:
+            if input_vector.nelement() <= 3 * 32 * 32:
                 logger.info("Using Jacobian for monotony test.")
                 self.monotony_fn = self.monotony_fn_jacobian
             else:
@@ -195,11 +195,15 @@ class TsengDescent(BasicSolver):
             # Update (one step)
             ak = self.operator.grad(xk, y=y)
             zk = self.indicator.prox(xk - gamma * ak, float("nan"))
-            xk = self.indicator.prox(zk - gamma * (self.operator.grad(zk, y=y) - ak), float("nan"))
+            xk = self.indicator.prox(
+                zk - gamma * (self.operator.grad(zk, y=y) - ak), float("nan")
+            )
 
             if save_gif_path is not None:
                 im = torchvision.transforms.ToPILImage()(xk.cpu().squeeze(0))
-                ImageDraw.Draw(im).text((10, 10), f"Step {step}", fill=(255, 255, 255, 128))
+                ImageDraw.Draw(im).text(
+                    (10, 10), f"Step {step}", fill=(255, 255, 255, 128)
+                )
                 images.append(im)
 
             # Compute metrics
@@ -214,7 +218,9 @@ class TsengDescent(BasicSolver):
             if self.monotony_fn is not None and step % self.n_test_monotony == 0:
                 logger.debug(f"Testing monotony at step {step}")
                 logger.debug("Testing monotony for operator...")
-                _, l_min_op = self.monotony_fn(lambda x: self.operator.grad(x, y), xk.detach())
+                _, l_min_op = self.monotony_fn(
+                    lambda x: self.operator.grad(x, y=y), xk.detach()
+                )
                 logger.debug("Testing monotony for regularization...")
                 _, l_min_reg = self.monotony_fn(self.operator.reg.grad, xk.detach())
                 self.metrics.add(
