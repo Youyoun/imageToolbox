@@ -65,12 +65,12 @@ class GenericDataset(data.Dataset):
             clean_im, noisy_im = self.images[item], self.noisy_images[item]
             if self.transforms is not None:
                 return self.transforms(clean_im, noisy_im)
+            return clean_im, noisy_im
         else:
             _, clean_im = get_clean_image(self.im_path[item], not self.colorized)
             if self.transforms is not None:
                 return self.transforms(clean_im, self.transform_fn(clean_im))
-            else:
-                return clean_im, self.transform_fn(clean_im)
+            return clean_im, self.transform_fn(clean_im)
 
     def get_image_path(self, item):
         return self.im_path[item]
