@@ -61,7 +61,9 @@ class MonotonyRegularization(nn.Module):
             f"Using {self.method.name} for computing regularisation. Tolerance for PI: {self.power_iter_tol}"
         )
 
-    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, model: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         return self._monotonicity_penalization(model, x)
 
     def _penalization_fulljacobian(
@@ -138,7 +140,9 @@ class MonotonyRegularization(nn.Module):
                 save_iterates=True,
             )
             self.iterates = [self.alpha - ev for ev in self.iterates]
-        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
+        vtOv = torch.sum(
+            (vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1
+        )
         vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
@@ -207,7 +211,9 @@ class MonotonyRegularization(nn.Module):
                 save_iterates=True,
             )
 
-        vtOv = torch.sum((vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1)
+        vtOv = torch.sum(
+            (vectors * operator(vectors)).view(vectors.shape[0], -1), dim=1
+        )
         vtv = torch.sum((vectors * vectors).view(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
@@ -251,7 +257,9 @@ class MonotonyRegularization(nn.Module):
         def operator(u):
             return sum_J_JT(x_new, y_new, u, self.is_eval)
 
-        vtOv = torch.sum((vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1)
+        vtOv = torch.sum(
+            (vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1
+        )
         vtv = torch.sum((vectors * vectors).reshape(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
@@ -294,7 +302,9 @@ class MonotonyRegularization(nn.Module):
         def operator(u):
             return sum_J_JT(x_new, y_new, u, self.is_eval)
 
-        vtOv = torch.sum((vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1)
+        vtOv = torch.sum(
+            (vectors * operator(vectors)).reshape(vectors.shape[0], -1), dim=1
+        )
         vtv = torch.sum((vectors * vectors).reshape(vectors.shape[0], -1), dim=1)
         rayleigh_coeff = vtOv / vtv
 
@@ -358,5 +368,9 @@ class MonotonyRegularizationShift(MonotonyRegularization):
 
         return two_net_minus_identity
 
-    def forward(self, model: Callable, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        return self._monotonicity_penalization(MonotonyRegularizationShift.shift_model(model), x)
+    def forward(
+        self, model: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        return self._monotonicity_penalization(
+            MonotonyRegularizationShift.shift_model(model), x
+        )
