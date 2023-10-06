@@ -146,4 +146,4 @@ def pieapp(
     if tensor_test.max() > 1 or tensor_test.min() < 0:
         print("tensor_test must be in the range [0, 1]. Clipping tensor_test.")
         tensor_test = torch.clamp(tensor_test, 0, 1)
-    return PieAPP()(tensor_true, tensor_test).item()
+    return PieAPP()(tensor_true, tensor_test).abs().item()
