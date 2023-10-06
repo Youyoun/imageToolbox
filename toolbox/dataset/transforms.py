@@ -3,10 +3,9 @@ from enum import auto
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from toolbox.utils import StrEnum
 from torchvision import transforms as T
 from torchvision.transforms import functional as F
-
-from toolbox.utils import StrEnum
 
 """
 The methods are defined in:
