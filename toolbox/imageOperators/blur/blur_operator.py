@@ -31,6 +31,11 @@ class Kernels(StrEnum):
     TYPE_F = enum.auto()
     TYPE_G = enum.auto()
     TYPE_H = enum.auto()
+    MVT_1 = enum.auto()
+    MVT_2 = enum.auto()
+    MVT_3 = enum.auto()
+    MVT_4 = enum.auto()
+    MVT_5 = enum.auto()
 
 
 kernel_type_img_map = {
@@ -42,6 +47,11 @@ kernel_type_img_map = {
     Kernels.TYPE_F: CURRENT_FILE_PATH / "kernels/kernel6.png",
     Kernels.TYPE_G: CURRENT_FILE_PATH / "kernels/kernel7.png",
     Kernels.TYPE_H: CURRENT_FILE_PATH / "kernels/kernel8.png",
+    Kernels.MVT_1: CURRENT_FILE_PATH / "kernels/mvt1.png",
+    Kernels.MVT_2: CURRENT_FILE_PATH / "kernels/mvt2.png",
+    Kernels.MVT_3: CURRENT_FILE_PATH / "kernels/mvt3.png",
+    Kernels.MVT_4: CURRENT_FILE_PATH / "kernels/mvt4.png",
+    Kernels.MVT_5: CURRENT_FILE_PATH / "kernels/mvt5.png",
 }
 
 
