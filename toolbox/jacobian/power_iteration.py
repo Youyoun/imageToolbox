@@ -16,7 +16,9 @@ MIN_POWER_ITERS = 10
 
 def batch_norm(tensor_: torch.Tensor) -> torch.Tensor:
     init_shape = tensor_.shape
-    return torch.norm(tensor_.reshape(init_shape[0], -1), dim=1).reshape(init_shape[0], -1)
+    return torch.norm(tensor_.reshape(init_shape[0], -1), dim=1).reshape(
+        init_shape[0], -1
+    )
 
 
 def batch_normalize_vector(vector: torch.Tensor) -> torch.Tensor:
@@ -104,10 +106,18 @@ def conjugate_gradient_smallest_ev(
         logger.debug(f"Max iter not specified, using {max_iter}")
 
     for k in range(max_iter):
-        ak = torch.sum(zk * uk, dim=[i for i in range(1, len(input_shape))], keepdim=True)
-        bk = torch.sum(zk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True)
-        ck = torch.sum(uk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True)
-        dk = torch.sum(pk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True)
+        ak = torch.sum(
+            zk * uk, dim=[i for i in range(1, len(input_shape))], keepdim=True
+        )
+        bk = torch.sum(
+            zk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True
+        )
+        ck = torch.sum(
+            uk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True
+        )
+        dk = torch.sum(
+            pk * pk, dim=[i for i in range(1, len(input_shape))], keepdim=True
+        )
 
         delta = (lk * dk - bk) ** 2 - 4 * (bk * ck - ak * dk) * (ak - lk * ck)
         alphak = (lk * dk - bk + torch.sqrt(delta)) / (2 * (bk * ck - ak * dk))
@@ -124,7 +134,12 @@ def conjugate_gradient_smallest_ev(
             logger.debug(f"Conjugate gradient converged at iteration: {k}")
             break
 
-        betak = -torch.sum(zk * gk, dim=[i for i in range(1, len(input_shape))], keepdim=True) / bk
+        betak = (
+            -torch.sum(
+                zk * gk, dim=[i for i in range(1, len(input_shape))], keepdim=True
+            )
+            / bk
+        )
         pk = gk + betak * pk
         zk = operator(pk)
 

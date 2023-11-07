@@ -20,6 +20,7 @@ from .utils import get_neuralnet_jacobian_ev
 
 class PenalizationMethods(StrEnum):
     POWER = enum.auto()
+    POWERNOALPHA = enum.auto()
     EVDECOMP = enum.auto()
     OPTPOWER = enum.auto()
     OPTPOWERNOALPHA = enum.auto()
@@ -113,6 +114,46 @@ class MonotonyRegularization(nn.Module):
             penalization(lambda_min, self.eps, self.use_relu),
             lambda_min.min().detach(),
         )
+
+    def _penalization_powermethod_noalpha(
+        self, net: Callable, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Penalization based on the power method. This method is optimized by not computing the full graph and not
+        knowing the alpha parameter. Instead, we compute the graph only once and then use it to backpropagate.
+        :param net: Neural network
+        :param x: Input data
+        :return: Penalization value and lambda min
+        """
+        # We ignore alpha this time, get lambda max then compute lambda min.
+        x_new = x.clone()
+        x_new.requires_grad_()
+        y_new = net(x_new)
+
+        def operator(u):
+            return sum_J_JT(x_new, y_new, u, self.is_eval)
+
+        with torch.no_grad():
+            _, lambda_max, _ = power_method(
+                x_new,
+                operator,
+                self.max_iters,
+                tol=self.power_iter_tol,
+            )
+            lambda_max = lambda_max.abs().max().item()
+        logger.debug(f"Lambda max = {lambda_max}")
+        if lambda_max < 0:
+            logger.warning(
+                "The lowest EV is bigger in module than the largest EV. Setting alpha to 0 in power method."
+            )
+            lambda_max = 0
+
+        # Small hack to compute lambda min using this method.
+        old_alpha = self.alpha
+        self.alpha = lambda_max
+        output = self._penalization_powermethod(net, x)
+        self.alpha = old_alpha
+        return output
 
     def _penalization_optpowermethod(
         self, net: Callable, x: torch.Tensor
@@ -324,6 +365,8 @@ class MonotonyRegularization(nn.Module):
         """
         if self.method == PenalizationMethods.POWER:
             return self._penalization_powermethod(net, x)
+        elif self.method == PenalizationMethods.POWERNOALPHA:
+            return self._penalization_powermethod_noalpha(net, x)
         elif self.method == PenalizationMethods.EVDECOMP:
             return self._penalization_fulljacobian(net, x)
         elif self.method == PenalizationMethods.OPTPOWER:
