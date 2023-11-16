@@ -218,7 +218,7 @@ class MonotonyRegularization(nn.Module):
                 self.max_iters,
                 tol=self.power_iter_tol,
             )
-            lambda_max = lambda_max.abs().max().item()
+            lambda_max = lambda_max.abs().max().item() * 1.1
         logger.debug(f"Lambda max = {lambda_max}")
         if lambda_max < 0:
             logger.warning(
