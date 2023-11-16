@@ -153,7 +153,7 @@ class TsengDescent(BasicSolver):
         :param real_x: Real vector to compute the L1 distance between the current iterate and the real vector.
         :return: Last iterate and metrics dictionary.
         """
-        _tol = 1e-5
+        _tol = 1e-8
         logger.info("Running Tseng's gradient descent algorithm...")
         logger.debug(
             f"Parameters: Armijo: {self.use_armijo} gamma={self.gamma}, lambda={self.lambda_}, max_iter={self.max_iter}"
