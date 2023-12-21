@@ -68,7 +68,7 @@ class MonotonyRegularization(nn.Module):
         return self._monotonicity_penalization(model, x)
 
     def _penalization_fulljacobian(
-        self, net: Callable, x: torch.Tensor
+        self, net: Callable, x: torch.Tensor, force_compute_batch=False
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Penalization based on the full jacobian.
@@ -76,7 +76,8 @@ class MonotonyRegularization(nn.Module):
         :param x: Input data
         :return: Penalization value and lambda min
         """
-        assert x.shape[0] == 1, "Batch size must be 1 for full jacobian"
+        if not force_compute_batch:
+            assert x.shape[0] == 1, "Batch size must be 1 for full jacobian"
         all_ev = get_neuralnet_jacobian_ev(net, x, self.is_eval)
         if self.is_eval:
             all_ev.detach_()
