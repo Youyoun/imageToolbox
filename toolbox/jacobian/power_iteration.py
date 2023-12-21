@@ -2,6 +2,7 @@ from typing import Any, Callable, List, Literal, Tuple, Union, overload
 
 import numpy as np
 import torch
+import tqdm
 from scipy.sparse.linalg import ArpackError, ArpackNoConvergence, LinearOperator
 from scipy.sparse.linalg import eigsh as scipy_eigsh
 from scipy.sparse.linalg import lobpcg as scipy_lobpcg
@@ -53,6 +54,7 @@ def power_method(
 
     z = None
     zold = None
+    # for it in tqdm.tqdm(np.arange(max_iter)):
     for it in np.arange(max_iter):
         v = operator(u)  # \alpha*u - (J+J^t).u (bs, C*W*H)
 
