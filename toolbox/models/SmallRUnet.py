@@ -20,16 +20,16 @@ def get_input_layer(
 ):
     if use_batchnorm:
         return nn.Sequential(
-            nn.Conv2d(channels, filters, 3, padding=1),
+            nn.Conv2d(channels, filters, 3, padding=1, padding_mode="reflect"),
             nn.BatchNorm2d(filters),
             get_activation(activation),
-            nn.Conv2d(filters, filters, 3, padding=1),
+            nn.Conv2d(filters, filters, 3, padding=1, padding_mode="reflect"),
         )
     else:
         return nn.Sequential(
-            nn.Conv2d(channels, filters, 3, padding=1),
+            nn.Conv2d(channels, filters, 3, padding=1, padding_mode="reflect"),
             get_activation(activation),
-            nn.Conv2d(filters, filters, 3, padding=1),
+            nn.Conv2d(filters, filters, 3, padding=1, padding_mode="reflect"),
         )
 
 
@@ -42,14 +42,26 @@ class ResidualConv(nn.Module):
         self.conv_block = nn.Sequential(
             get_activation(activation),
             nn.Conv2d(
-                input_dim, output_dim, kernel_size=3, stride=stride, padding=padding
+                input_dim,
+                output_dim,
+                kernel_size=3,
+                stride=stride,
+                padding=padding,
+                padding_mode="reflect",
             ),
             get_activation(activation),
-            nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
+            nn.Conv2d(
+                output_dim, output_dim, kernel_size=3, padding=1, padding_mode="reflect"
+            ),
         )
 
         self.conv_skip = nn.Conv2d(
-            input_dim, output_dim, kernel_size=3, stride=stride, padding=1
+            input_dim,
+            output_dim,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            padding_mode="reflect",
         )
 
     def forward(self, x):
