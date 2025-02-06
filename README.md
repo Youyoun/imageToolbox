@@ -1,0 +1,1 @@
+A toolbox containing utility functions needed to train imaging models for denoising/deblurring tasks. Contains a bunch of tools to manipulate Neural network jacobians, compute proximal/Tseng descente, and some basic operators. 
